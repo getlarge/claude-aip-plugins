@@ -15,13 +15,31 @@ Find all OpenAPI specifications in this codebase using the deterministic discove
 
 ## Instructions
 
-1. **Run the discover script**:
+1. **Determine the plugin root path**:
+
+   The plugin scripts are located relative to `CLAUDE_PLUGIN_ROOT`. When running as an installed plugin, this environment variable is available. You can find the discover script at:
+
+   ```
+   ${CLAUDE_PLUGIN_ROOT}/scripts/src/discover.js
+   ```
+
+   To find the actual path, check the session start hook output or locate the plugin installation (typically `~/.claude/plugins/aip-api-design@*/`).
+
+2. **Run the discover script**:
 
    ```bash
-   node /path/to/plugins/aip-api-design/scripts/src/discover.js {directory} --format markdown
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/src/discover.js" {directory} --format markdown
+   ```
+
+   If `CLAUDE_PLUGIN_ROOT` is not set, find the plugin directory first:
+
+   ```bash
+   PLUGIN_DIR=$(find ~/.claude/plugins -name "aip-api-design@*" -type d 2>/dev/null | head -1)
+   node "${PLUGIN_DIR}/scripts/src/discover.js" {directory} --format markdown
    ```
 
    The script will:
+
    - Search recursively for files named `openapi.yaml`, `swagger.json`, etc.
    - Look in common API directories (`api/`, `docs/`, `specs/`, etc.)
    - Skip `node_modules`, `.git`, `dist`, etc.
@@ -30,15 +48,17 @@ Find all OpenAPI specifications in this codebase using the deterministic discove
    - Detect if specs are auto-generated
 
    Optional flags:
+
    - `--format json`: Machine-readable output
    - `--depth 5`: Limit directory recursion depth
 
-2. **Save the output** to:
+3. **Save the output** to:
+
    ```
    thoughts/api/discovery/{YYYY-MM-DD}-discovery.md
    ```
 
-3. **Present findings to user**:
+4. **Present findings to user**:
    - List specs found with path and metadata
    - Highlight any parse errors
    - Recommend running `/api-review {spec-path}` on specific specs
@@ -48,30 +68,33 @@ Find all OpenAPI specifications in this codebase using the deterministic discove
 
 For each spec found:
 
-| Field | Description |
-| ----- | ----------- |
-| path | Relative path to spec file |
-| type | `openapi-3.x`, `openapi-3.1`, `swagger-2.x` |
-| title | API title from `info.title` |
-| apiVersion | Version from `info.version` |
-| pathCount | Number of paths |
-| operationCount | Number of operations (GET, POST, etc.) |
-| servers | Server URLs if defined |
-| isGenerated | Whether spec appears auto-generated |
+| Field          | Description                                 |
+| -------------- | ------------------------------------------- |
+| path           | Relative path to spec file                  |
+| type           | `openapi-3.x`, `openapi-3.1`, `swagger-2.x` |
+| title          | API title from `info.title`                 |
+| apiVersion     | Version from `info.version`                 |
+| pathCount      | Number of paths                             |
+| operationCount | Number of operations (GET, POST, etc.)      |
+| servers        | Server URLs if defined                      |
+| isGenerated    | Whether spec appears auto-generated         |
 
 ## What It Searches For
 
 **Filenames:**
+
 - `openapi.yaml`, `openapi.yml`, `openapi.json`
 - `swagger.yaml`, `swagger.yml`, `swagger.json`
 - `api.yaml`, `api.yml`, `api.json`
 - Any file containing `openapi` or `swagger` in name
 
 **Directories prioritized:**
+
 - `api/`, `docs/`, `spec/`, `specs/`
 - `openapi/`, `swagger/`, `schema/`, `schemas/`
 
 **Skipped:**
+
 - `node_modules/`, `.git/`, `dist/`, `build/`, `coverage/`
 
 ## Example Session
