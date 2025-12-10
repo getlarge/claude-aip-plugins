@@ -1,0 +1,61 @@
+{
+  "name": "aip-openapi-reviewer",
+  "version": "1.0.0",
+  "description": "Review OpenAPI specifications against Google's API Improvement Proposals (AIP)",
+  "type": "module",
+  "main": "./src/index.js",
+  "types": "./src/types.ts",
+  "exports": {
+    ".": {
+      "import": "./src/index.js",
+      "types": "./src/types.ts"
+    },
+    "./rules": {
+      "import": "./src/rules.js"
+    },
+    "./formatters": {
+      "import": "./src/formatters.js"
+    }
+  },
+  "bin": {
+    "aip-review": "./src/cli.js"
+  },
+  "scripts": {
+    "review": "node src/cli.js",
+    "test": "node --test src/**/*.test.js",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "openapi",
+    "api",
+    "aip",
+    "google",
+    "linter",
+    "review",
+    "rest",
+    "swagger"
+  ],
+  "files": [
+    "src/"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {},
+  "optionalDependencies": {
+    "yaml": "^2.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "yaml": ">=2.0.0"
+  },
+  "peerDependenciesMeta": {
+    "yaml": {
+      "optional": true
+    }
+  }
+}
