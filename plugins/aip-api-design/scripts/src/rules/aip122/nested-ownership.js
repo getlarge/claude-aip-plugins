@@ -9,7 +9,7 @@
  */
 
 import { PathRule } from '../base.js';
-import { pathToJsonPath } from '../helpers/index.js';
+import { pathToJsonPath, isVersionPrefix } from '../helpers/index.js';
 
 /**
  * Rule: Nested resource parameters should reflect parent ownership
@@ -33,8 +33,29 @@ export class NestedOwnershipRule extends PathRule {
    * @returns {import('../../types.ts').Finding[]}
    */
   checkPath(path, pathItem, spec, ctx) {
+    /** @type {import('../../types.ts').Finding[]} */
     const findings = [];
     const segments = path.split('/').filter(Boolean);
+
+    // Filter out version prefixes (v1, api, etc.) to count actual resource nesting
+    const resourceSegments = segments.filter((s) => !isVersionPrefix(s));
+
+    // Count resource-parameter pairs to determine nesting depth
+    // A truly nested path has multiple resource/{param} patterns
+    // e.g., /users/{userId}/orders/{orderId} has 2 resource-param pairs
+    let resourceParamPairs = 0;
+    for (let i = 0; i < resourceSegments.length - 1; i++) {
+      const current = resourceSegments[i];
+      const next = resourceSegments[i + 1];
+      if (!current.startsWith('{') && next && next.startsWith('{')) {
+        resourceParamPairs++;
+      }
+    }
+
+    // Only check for nested ownership if there are multiple resource-param pairs
+    if (resourceParamPairs < 2) {
+      return findings;
+    }
 
     // Find parameter segments and their preceding resource
     for (let i = 1; i < segments.length; i++) {
@@ -44,11 +65,11 @@ export class NestedOwnershipRule extends PathRule {
       const paramName = segment.slice(1, -1); // Remove { }
       const parentResource = segments[i - 1];
 
-      // Skip if parent is also a parameter
-      if (parentResource.startsWith('{')) continue;
+      // Skip if parent is also a parameter or a version prefix
+      if (parentResource.startsWith('{') || isVersionPrefix(parentResource)) continue;
 
-      // Check if generic 'id' is used in nested context
-      if (paramName === 'id' && i > 1) {
+      // Check if generic 'id' is used
+      if (paramName === 'id') {
         // Get singular form of parent for suggestion
         const singularParent = parentResource.endsWith('s')
           ? parentResource.slice(0, -1)
