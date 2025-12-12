@@ -25,6 +25,8 @@
     "review": "node src/cli.js",
     "discover": "node src/discover.js",
     "test": "node --test src/**/*.test.js",
+    "test:integration": "node --test tests/**/*.test.js",
+    "test:all": "node --test src/**/*.test.js tests/**/*.test.js",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit"
   },

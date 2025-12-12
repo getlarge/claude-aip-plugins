@@ -1,0 +1,1167 @@
+# Acme Commerce API - Test Fixture
+# A deliberately mixed-quality API spec for testing AIP rules
+# Contains both compliant and non-compliant patterns
+#
+# Legend:
+#   ✅ = Compliant (should NOT trigger findings)
+#   ❌ = Non-compliant (SHOULD trigger findings)
+#   📋 = See comment for expected rule
+
+openapi: 3.1.0
+info:
+  title: Acme Commerce API
+  description: |
+    A fictional B2B e-commerce platform API.
+    This spec intentionally contains both good and bad patterns for testing.
+  version: 1.0.0
+  contact:
+    name: Acme API Team
+    email: api@acme.example.com
+
+servers:
+  - url: https://api.acme.example.com/v1
+    description: Production
+
+tags:
+  - name: Orders
+    description: Order management
+  - name: Products
+    description: Product catalog
+  - name: Customers
+    description: Customer accounts
+  - name: Webhooks
+    description: Event subscriptions
+  - name: Reports
+    description: Analytics and reporting
+
+paths:
+  # ============================================
+  # ORDERS - Mixed compliance
+  # ============================================
+
+  # ❌ naming/no-verbs - verb prefix in path
+  /getOrder/{id}:
+    get:
+      tags: [Orders]
+      summary: Get order by ID (BAD - verb in path)
+      operationId: getOrderById
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: Order found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ❌ pagination/list-paginated - no pagination params
+  # ❌ filtering/list-filterable - no filter params
+  # ❌ filtering/list-has-ordering - no order_by
+  # ❌ errors/responses-documented - no error responses
+  /orders:
+    get:
+      tags: [Orders]
+      summary: List all orders (BAD - no pagination, filtering, or error docs)
+      operationId: listOrders
+      responses:
+        '200':
+          description: List of orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+
+    # ❌ methods/post-returns-201 - returns 200 instead of 201
+    # ❌ idempotency/post-has-key - no Idempotency-Key header
+    post:
+      tags: [Orders]
+      summary: Create order (BAD - returns 200, no idempotency)
+      operationId: createOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '200':
+          description: Order created (wrong - should be 201)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+
+  /orders/{orderId}:
+    get:
+      tags: [Orders]
+      summary: Get order by ID
+      operationId: getOrder
+      parameters:
+        - $ref: '#/components/parameters/OrderIdPath'
+      responses:
+        '200':
+          description: Order found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    # ❌ methods/patch-over-put - PUT without PATCH
+    put:
+      tags: [Orders]
+      summary: Replace order (BAD - should use PATCH for partial updates)
+      operationId: replaceOrder
+      parameters:
+        - $ref: '#/components/parameters/OrderIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Order'
+      responses:
+        '200':
+          description: Order replaced
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ✅ Custom method - allowed pattern
+  /orders/{orderId}:cancel:
+    post:
+      tags: [Orders]
+      summary: Cancel an order (OK - custom method with colon)
+      operationId: cancelOrder
+      parameters:
+        - $ref: '#/components/parameters/OrderIdPath'
+        - name: Idempotency-Key
+          in: header
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Order cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================
+  # PRODUCTS - Mixed compliance
+  # ============================================
+
+  # ❌ naming/plural-resources - singular resource name
+  /product:
+    get:
+      tags: [Products]
+      summary: List products (BAD - singular path)
+      operationId: listProducts
+      parameters:
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            # ❌ pagination/max-page-size - no maximum
+        - name: page_token
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of products
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductList'
+
+  /product/{id}:
+    get:
+      tags: [Products]
+      summary: Get product by ID
+      operationId: getProduct
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Product found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    # ❌ methods/delete-idempotent - DELETE with request body
+    delete:
+      tags: [Products]
+      summary: Delete product (BAD - has request body)
+      operationId: deleteProduct
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: Reason for deletion
+      responses:
+        '204':
+          description: Product deleted
+
+  # ============================================
+  # CUSTOMERS - Mostly compliant (for false-positive testing)
+  # ============================================
+
+  # ✅ Proper plural naming
+  # ✅ Has pagination with max
+  # ✅ Has filtering
+  # ✅ Has ordering
+  # ✅ Has error responses
+  /customers:
+    get:
+      tags: [Customers]
+      summary: List customers (GOOD - proper pagination, filtering, ordering)
+      operationId: listCustomers
+      parameters:
+        - name: page_size
+          in: query
+          description: Number of results per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: page_token
+          in: query
+          description: Token for next page
+          schema:
+            type: string
+        - name: filter
+          in: query
+          description: Filter expression (e.g., "status=active")
+          schema:
+            type: string
+        - name: order_by
+          in: query
+          description: Sort order (e.g., "created_at desc")
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of customers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    # ✅ Returns 201
+    # ✅ Has Idempotency-Key
+    post:
+      tags: [Customers]
+      summary: Create customer (GOOD - proper status code and idempotency)
+      operationId: createCustomer
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          description: Unique key for idempotent requests
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCustomerRequest'
+      responses:
+        '201':
+          description: Customer created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /customers/{customerId}:
+    get:
+      tags: [Customers]
+      summary: Get customer by ID
+      operationId: getCustomer
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+      responses:
+        '200':
+          description: Customer found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    # ✅ Uses PATCH for partial updates
+    patch:
+      tags: [Customers]
+      summary: Update customer (GOOD - uses PATCH)
+      operationId: updateCustomer
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCustomerRequest'
+      responses:
+        '200':
+          description: Customer updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    # ✅ DELETE returns 204, no body
+    delete:
+      tags: [Customers]
+      summary: Delete customer (GOOD - proper response)
+      operationId: deleteCustomer
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+      responses:
+        '204':
+          description: Customer deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ✅ Nested resource with proper naming
+  /customers/{customerId}/addresses:
+    get:
+      tags: [Customers]
+      summary: List customer addresses
+      operationId: listCustomerAddresses
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            maximum: 50
+        - name: page_token
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of addresses
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddressList'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ❌ naming/nested-ownership - uses generic {id} in nested path
+  /customers/{customerId}/addresses/{id}:
+    get:
+      tags: [Customers]
+      summary: Get address (BAD - generic {id} parameter)
+      operationId: getCustomerAddress
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Address found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Address'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================
+  # WEBHOOKS - Non-compliant
+  # ============================================
+
+  # ❌ naming/plural-resources - singular
+  /webhook:
+    get:
+      tags: [Webhooks]
+      summary: List webhooks (BAD - singular path)
+      operationId: listWebhooks
+      responses:
+        '200':
+          description: List of webhooks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Webhook'
+
+    # ❌ idempotency/post-has-key - no idempotency header
+    # ❌ errors/responses-documented - no error responses
+    post:
+      tags: [Webhooks]
+      summary: Create webhook (BAD - no idempotency, no error docs)
+      operationId: createWebhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWebhookRequest'
+      responses:
+        '201':
+          description: Webhook created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+
+  # ============================================
+  # REPORTS - Long-running operations (async)
+  # ============================================
+
+  /reports:
+    # ❌ methods/get-no-body - GET with request body (bad pattern for complex queries)
+    get:
+      tags: [Reports]
+      summary: Query reports (BAD - GET with body)
+      operationId: queryReports
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                date_range:
+                  type: object
+                  properties:
+                    start:
+                      type: string
+                      format: date
+                    end:
+                      type: string
+                      format: date
+      responses:
+        '200':
+          description: Report results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Report'
+
+    # ✅ Returns 202 for async operation
+    post:
+      tags: [Reports]
+      summary: Generate report (GOOD - returns 202 for async)
+      operationId: generateReport
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateReportRequest'
+      responses:
+        '202':
+          description: Report generation started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportJob'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /reports/{reportId}:
+    get:
+      tags: [Reports]
+      summary: Get report status/result
+      operationId: getReport
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Report found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================
+  # INVENTORY - Inconsistent casing
+  # ============================================
+
+  # ❌ naming/consistent-casing - mixed casing across paths
+  /inventory_items:
+    get:
+      tags: [Products]
+      summary: List inventory (snake_case path)
+      operationId: listInventoryItems
+      parameters:
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            maximum: 100
+        - name: sort
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Inventory items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InventoryItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /stockLevels:
+    get:
+      tags: [Products]
+      summary: Get stock levels (camelCase path - inconsistent!)
+      operationId: getStockLevels
+      responses:
+        '200':
+          description: Stock levels
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # ============================================
+  # HEALTH & STATUS - Exceptions
+  # ============================================
+
+  # ✅ Exception - health is allowed singular
+  /health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, degraded, unhealthy]
+
+  # ✅ Exception - status is allowed singular
+  /status:
+    get:
+      summary: Service status
+      operationId: getStatus
+      responses:
+        '200':
+          description: Service status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version:
+                    type: string
+                  uptime:
+                    type: integer
+
+  # ============================================
+  # SEARCH - POST for complex queries (exception)
+  # ============================================
+
+  # ✅ Search endpoints are exceptions for idempotency
+  /products/search:
+    post:
+      tags: [Products]
+      summary: Search products (OK - search endpoints don't need idempotency)
+      operationId: searchProducts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+                filters:
+                  type: object
+                page_size:
+                  type: integer
+                  maximum: 100
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductSearchResults'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  # ============================================
+  # NON-STANDARD ERROR CODES
+  # ============================================
+
+  # ❌ errors/standard-codes - 418 is non-standard
+  /teapot:
+    get:
+      summary: Easter egg endpoint (BAD - non-standard error code)
+      operationId: getTeapot
+      responses:
+        '200':
+          description: Not a teapot today
+          content:
+            application/json:
+              schema:
+                type: object
+        '418':
+          description: I'm a teapot
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+components:
+  parameters:
+    OrderId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    OrderIdPath:
+      name: orderId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    CustomerId:
+      name: customerId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    # ============================================
+    # ORDER SCHEMAS
+    # ============================================
+
+    Order:
+      type: object
+      required:
+        - id
+        - customer_id
+        - status
+        - items
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        customer_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, confirmed, shipped, delivered, cancelled]
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        total_amount:
+          type: number
+          format: decimal
+        currency:
+          type: string
+          default: USD
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    OrderItem:
+      type: object
+      required:
+        - product_id
+        - quantity
+        - unit_price
+      properties:
+        product_id:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+        unit_price:
+          type: number
+          format: decimal
+
+    CreateOrderRequest:
+      type: object
+      required:
+        - customer_id
+        - items
+      properties:
+        customer_id:
+          type: string
+          format: uuid
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+              - product_id
+              - quantity
+            properties:
+              product_id:
+                type: string
+                format: uuid
+              quantity:
+                type: integer
+                minimum: 1
+
+    # ============================================
+    # PRODUCT SCHEMAS
+    # ============================================
+
+    Product:
+      type: object
+      required:
+        - id
+        - name
+        - price
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+          format: decimal
+        currency:
+          type: string
+          default: USD
+        category:
+          type: string
+        in_stock:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    ProductList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+        # ❌ pagination/response-has-next-token - missing next_page_token
+
+    ProductSearchResults:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+        total_count:
+          type: integer
+        next_page_token:
+          type: string
+
+    InventoryItem:
+      type: object
+      properties:
+        product_id:
+          type: string
+        quantity:
+          type: integer
+        warehouse:
+          type: string
+
+    # ============================================
+    # CUSTOMER SCHEMAS
+    # ============================================
+
+    Customer:
+      type: object
+      required:
+        - id
+        - email
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        phone:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive, suspended]
+        created_at:
+          type: string
+          format: date-time
+
+    CustomerList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Customer'
+        next_page_token:
+          type: string
+        total_count:
+          type: integer
+
+    CreateCustomerRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        phone:
+          type: string
+
+    UpdateCustomerRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive]
+
+    Address:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [billing, shipping]
+        line1:
+          type: string
+        line2:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        postal_code:
+          type: string
+        country:
+          type: string
+
+    AddressList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Address'
+        next_page_token:
+          type: string
+
+    # ============================================
+    # WEBHOOK SCHEMAS
+    # ============================================
+
+    Webhook:
+      type: object
+      required:
+        - id
+        - url
+        - events
+      properties:
+        id:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            type: string
+        active:
+          type: boolean
+          default: true
+        secret:
+          type: string
+          writeOnly: true
+
+    CreateWebhookRequest:
+      type: object
+      required:
+        - url
+        - events
+      properties:
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            enum:
+              - order.created
+              - order.updated
+              - order.cancelled
+              - customer.created
+              - customer.updated
+
+    # ============================================
+    # REPORT SCHEMAS
+    # ============================================
+
+    Report:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [sales, inventory, customers]
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        result_url:
+          type: string
+          format: uri
+        created_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+
+    ReportJob:
+      type: object
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, processing]
+        estimated_completion:
+          type: string
+          format: date-time
+        poll_url:
+          type: string
+          format: uri
+
+    GenerateReportRequest:
+      type: object
+      required:
+        - type
+        - date_range
+      properties:
+        type:
+          type: string
+          enum: [sales, inventory, customers]
+        date_range:
+          type: object
+          required:
+            - start
+            - end
+          properties:
+            start:
+              type: string
+              format: date
+            end:
+              type: string
+              format: date
+        format:
+          type: string
+          enum: [json, csv, xlsx]
+          default: json
+
+    # ============================================
+    # ERROR SCHEMA
+    # ============================================
+
+    # ✅ errors/schema-defined - proper error schema exists
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code
+          example: INVALID_ARGUMENT
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              reason:
+                type: string
+        request_id:
+          type: string
+          format: uuid
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: INVALID_ARGUMENT
+            message: Invalid request parameters
+            details:
+              - field: email
+                reason: Invalid email format
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: UNAUTHENTICATED
+            message: Authentication required
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: NOT_FOUND
+            message: Resource not found
+
+    Conflict:
+      description: Resource conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: ALREADY_EXISTS
+            message: Resource already exists
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+security:
+  - bearerAuth: []
+  - apiKey: []
