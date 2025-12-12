@@ -16,6 +16,8 @@ import {
   findSingletonResources,
   isSingletonPath,
   isSingular,
+  pathToJsonPath,
+  computeRenamedPath,
 } from '../helpers/index.js';
 
 /**
@@ -75,12 +77,28 @@ export class PluralResourcesRule extends PathRule {
       if (isSingletonPath(pathToSegment, singletons)) continue;
 
       if (isSingular(segment)) {
+        const suggestedPlural = `${segment}s`;
+        const newPath = computeRenamedPath(path, segment, suggestedPlural);
         findings.push(
           ctx.createFinding({
             path,
             message: `Resource name '${segment}' appears singular. Use plural form.`,
-            suggestion: `Rename to '${segment}s' or appropriate plural`,
-            context: { segment, suggestedFix: `${segment}s` },
+            suggestion: `Rename to '${suggestedPlural}' or appropriate plural`,
+            context: { segment, suggestedFix: suggestedPlural },
+            fix: {
+              type: 'rename-path-segment',
+              jsonPath: pathToJsonPath(path),
+              target: { segment, segmentIndex: i },
+              replacement: suggestedPlural,
+              specChanges: [
+                {
+                  operation: 'rename-key',
+                  path: '$.paths',
+                  from: path,
+                  to: newPath,
+                },
+              ],
+            },
           })
         );
       }

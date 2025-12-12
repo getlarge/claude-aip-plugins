@@ -9,6 +9,7 @@
  */
 
 import { PathRule } from '../base.js';
+import { pathToJsonPath } from '../helpers/index.js';
 
 /**
  * Rule: Nested resource parameters should reflect parent ownership
@@ -52,16 +53,32 @@ export class NestedOwnershipRule extends PathRule {
         const singularParent = parentResource.endsWith('s')
           ? parentResource.slice(0, -1)
           : parentResource;
+        const suggestedName = `${singularParent}Id`;
+        const newPath = path.replace(`{${paramName}}`, `{${suggestedName}}`);
 
         findings.push(
           ctx.createFinding({
             path,
-            message: `Generic '{id}' in nested path. Use descriptive name like '{${singularParent}Id}'`,
-            suggestion: `Rename to {${singularParent}Id} to clarify ownership`,
+            message: `Generic '{id}' in nested path. Use descriptive name like '{${suggestedName}}'`,
+            suggestion: `Rename to {${suggestedName}} to clarify ownership`,
             context: {
               paramName,
               parentResource,
-              suggestedName: `${singularParent}Id`,
+              suggestedName,
+            },
+            fix: {
+              type: 'rename-parameter',
+              jsonPath: pathToJsonPath(path),
+              target: { paramName, parentResource, parameterIndex: i },
+              replacement: suggestedName,
+              specChanges: [
+                {
+                  operation: 'rename-key',
+                  path: '$.paths',
+                  from: path,
+                  to: newPath,
+                },
+              ],
             },
           })
         );

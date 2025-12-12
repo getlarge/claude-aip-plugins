@@ -9,6 +9,7 @@
  */
 
 import { SpecRule } from '../base.js';
+import { schemasContainerJsonPath, schemaToJsonPath } from '../helpers/index.js';
 
 /**
  * Rule: Error schema should be defined
@@ -38,29 +39,41 @@ export class ErrorSchemaDefinedRule extends SpecRule {
     );
 
     if (errorSchemas.length === 0) {
+      const suggestedSchema = {
+        type: 'object',
+        required: ['error'],
+        properties: {
+          error: {
+            type: 'object',
+            required: ['code', 'message'],
+            properties: {
+              code: { type: 'string', description: 'Error code' },
+              message: { type: 'string', description: 'Human-readable error message' },
+              details: { type: 'array', description: 'Additional error details' },
+              request_id: { type: 'string', description: 'Request identifier for debugging' },
+            },
+          },
+        },
+      };
       findings.push(
         ctx.createFinding({
           path: 'components/schemas',
           message: 'No error schema defined',
           suggestion:
             'Define an Error schema with code, message, and details fields',
-          context: {
-            suggestedSchema: {
-              type: 'object',
-              required: ['error'],
-              properties: {
-                error: {
-                  type: 'object',
-                  required: ['code', 'message'],
-                  properties: {
-                    code: { type: 'string' },
-                    message: { type: 'string' },
-                    details: { type: 'array' },
-                    request_id: { type: 'string' },
-                  },
-                },
+          context: { suggestedSchema },
+          fix: {
+            type: 'add-schema',
+            jsonPath: schemasContainerJsonPath(),
+            target: { schemaName: 'Error' },
+            replacement: suggestedSchema,
+            specChanges: [
+              {
+                operation: 'set',
+                path: schemaToJsonPath('Error'),
+                value: suggestedSchema,
               },
-            },
+            ],
           },
         })
       );

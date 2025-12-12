@@ -10,7 +10,7 @@
  */
 
 import { OperationRule } from '../base.js';
-import { isCollectionEndpoint } from '../helpers/index.js';
+import { isCollectionEndpoint, parametersToJsonPath } from '../helpers/index.js';
 
 /**
  * Rule: List endpoints should have filtering
@@ -61,12 +61,32 @@ export class HasFilteringRule extends OperationRule {
     );
 
     if (!hasFilterParam && !hasFieldFilters) {
+      const suggestedParam = {
+        name: 'filter',
+        in: 'query',
+        required: false,
+        schema: { type: 'string' },
+        description: 'Filter expression (AIP-160 syntax)',
+      };
       findings.push(
         ctx.createFinding({
           path: `${method} ${path}`,
           message: 'List endpoint has no filter parameters',
           suggestion:
             'Add filter parameter or field-specific filters (e.g., status, created_after)',
+          context: { suggestedParam },
+          fix: {
+            type: 'add-parameter',
+            jsonPath: parametersToJsonPath(path, method),
+            replacement: suggestedParam,
+            specChanges: [
+              {
+                operation: 'add',
+                path: parametersToJsonPath(path, method),
+                value: suggestedParam,
+              },
+            ],
+          },
         })
       );
     }

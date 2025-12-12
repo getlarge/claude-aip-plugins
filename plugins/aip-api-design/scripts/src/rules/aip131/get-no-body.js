@@ -9,6 +9,7 @@
  */
 
 import { OperationRule } from '../base.js';
+import { requestBodyToJsonPath, operationToJsonPath } from '../helpers/index.js';
 
 /**
  * Rule: GET requests should not have a request body
@@ -45,6 +46,16 @@ export class GetNoBodyRule extends OperationRule {
           message: 'GET requests should not have a request body',
           suggestion:
             'Move body parameters to query parameters, or use POST for complex queries',
+          fix: {
+            type: 'remove-request-body',
+            jsonPath: operationToJsonPath(path, method),
+            specChanges: [
+              {
+                operation: 'remove',
+                path: requestBodyToJsonPath(path, method),
+              },
+            ],
+          },
         })
       );
     }

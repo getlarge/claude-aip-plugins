@@ -9,6 +9,7 @@
  */
 
 import { PathRule } from '../base.js';
+import { pathToJsonPath, operationToJsonPath } from '../helpers/index.js';
 
 /**
  * Rule: Prefer PATCH for partial updates
@@ -38,6 +39,22 @@ export class PatchOverPutRule extends PathRule {
     if (!path.includes('{')) return findings;
 
     if (pathItem.put && !pathItem.patch) {
+      // Create a PATCH operation template based on the PUT operation
+      const patchOperation = {
+        summary: 'Partially update resource',
+        description: 'Update resource fields using field mask (AIP-134)',
+        parameters: [
+          {
+            name: 'update_mask',
+            in: 'query',
+            required: false,
+            schema: { type: 'string' },
+            description: 'Field mask specifying which fields to update',
+          },
+        ],
+        requestBody: pathItem.put.requestBody,
+        responses: pathItem.put.responses,
+      };
       findings.push(
         ctx.createFinding({
           path: `PUT ${path}`,
@@ -45,6 +62,19 @@ export class PatchOverPutRule extends PathRule {
             'Using PUT without PATCH. Consider adding PATCH for partial updates.',
           suggestion:
             'Add PATCH endpoint with field mask support for partial updates',
+          fix: {
+            type: 'add-operation',
+            jsonPath: pathToJsonPath(path),
+            target: { method: 'patch', basedOn: 'put' },
+            replacement: patchOperation,
+            specChanges: [
+              {
+                operation: 'set',
+                path: operationToJsonPath(path, 'patch'),
+                value: patchOperation,
+              },
+            ],
+          },
         })
       );
     }

@@ -16,6 +16,8 @@ import {
   isCustomMethod,
   findSingletonResources,
   looksLikeVerb,
+  pathToJsonPath,
+  computeRenamedPath,
 } from '../helpers/index.js';
 
 /**
@@ -69,19 +71,35 @@ export class NoVerbsRule extends PathRule {
       if (isCustomMethod(segment, path, singletons)) continue;
 
       if (looksLikeVerb(segment)) {
+        // Extract the noun by removing common verb prefixes
+        const extractedNoun =
+          segment
+            .replace(
+              /^(get|fetch|create|add|update|delete|remove|list|find|search)/i,
+              ''
+            )
+            .toLowerCase() || 'resource';
+        const newPath = computeRenamedPath(path, segment, extractedNoun);
         findings.push(
           ctx.createFinding({
             path,
             message: `Path contains verb '${segment}'. Use nouns for resources.`,
-            suggestion: `Extract the noun (e.g., '${
-              segment
-                .replace(
-                  /^(get|fetch|create|add|update|delete|remove|list|find|search)/i,
-                  ''
-                )
-                .toLowerCase() || 'resource'
-            }')`,
+            suggestion: `Extract the noun (e.g., '${extractedNoun}')`,
             context: { segment },
+            fix: {
+              type: 'rename-path-segment',
+              jsonPath: pathToJsonPath(path),
+              target: { segment, extractedNoun },
+              replacement: extractedNoun,
+              specChanges: [
+                {
+                  operation: 'rename-key',
+                  path: '$.paths',
+                  from: path,
+                  to: newPath,
+                },
+              ],
+            },
           })
         );
       }

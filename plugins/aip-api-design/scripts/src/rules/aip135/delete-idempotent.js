@@ -9,6 +9,11 @@
  */
 
 import { OperationRule } from '../base.js';
+import {
+  operationToJsonPath,
+  requestBodyToJsonPath,
+  responsesToJsonPath,
+} from '../helpers/index.js';
 
 /**
  * Rule: DELETE should be idempotent
@@ -45,6 +50,16 @@ export class DeleteIdempotentRule extends OperationRule {
           path: `${method} ${path}`,
           message: 'DELETE should not have a request body',
           suggestion: 'Move any required data to path or query parameters',
+          fix: {
+            type: 'remove-request-body',
+            jsonPath: operationToJsonPath(path, method),
+            specChanges: [
+              {
+                operation: 'remove',
+                path: requestBodyToJsonPath(path, method),
+              },
+            ],
+          },
         })
       );
     }
@@ -59,6 +74,20 @@ export class DeleteIdempotentRule extends OperationRule {
           message:
             'DELETE returns 201 Created, which implies non-idempotent behavior',
           suggestion: 'Use 200 OK, 204 No Content, or 202 Accepted instead',
+          fix: {
+            type: 'change-status-code',
+            jsonPath: responsesToJsonPath(path, method),
+            target: { currentCode: '201', suggestedCode: '204' },
+            replacement: '204',
+            specChanges: [
+              {
+                operation: 'rename-key',
+                path: responsesToJsonPath(path, method),
+                from: '201',
+                to: '204',
+              },
+            ],
+          },
         })
       );
     }
@@ -74,6 +103,7 @@ export class DeleteIdempotentRule extends OperationRule {
       successCodes.length > 0 &&
       !successCodes.some((c) => ['200', '202', '204'].includes(c))
     ) {
+      const unusualCode = successCodes[0];
       findings.push(
         ctx.createFinding({
           path: `${method} ${path}`,
@@ -81,6 +111,20 @@ export class DeleteIdempotentRule extends OperationRule {
             ', '
           )}`,
           suggestion: 'Use 200 OK (with body), 204 No Content, or 202 Accepted',
+          fix: {
+            type: 'change-status-code',
+            jsonPath: responsesToJsonPath(path, method),
+            target: { currentCode: unusualCode, suggestedCode: '204' },
+            replacement: '204',
+            specChanges: [
+              {
+                operation: 'rename-key',
+                path: responsesToJsonPath(path, method),
+                from: unusualCode,
+                to: '204',
+              },
+            ],
+          },
         })
       );
     }

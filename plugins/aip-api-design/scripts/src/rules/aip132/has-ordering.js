@@ -9,7 +9,7 @@
  */
 
 import { OperationRule } from '../base.js';
-import { isCollectionEndpoint } from '../helpers/index.js';
+import { isCollectionEndpoint, parametersToJsonPath } from '../helpers/index.js';
 
 /**
  * Rule: List endpoints should have ordering
@@ -58,19 +58,31 @@ export class HasOrderingRule extends OperationRule {
     );
 
     if (!hasOrderParam) {
+      const suggestedParam = {
+        name: 'order_by',
+        in: 'query',
+        required: false,
+        schema: { type: 'string' },
+        description: 'Sort order (e.g., "created_at desc")',
+      };
       findings.push(
         ctx.createFinding({
           path: `${method} ${path}`,
           message: 'List endpoint missing ordering parameter',
           suggestion:
             'Add order_by query parameter (e.g., "created_at desc, name asc")',
-          context: {
-            suggestedParam: {
-              name: 'order_by',
-              in: 'query',
-              schema: { type: 'string' },
-              description: 'Sort order (e.g., "created_at desc")',
-            },
+          context: { suggestedParam },
+          fix: {
+            type: 'add-parameter',
+            jsonPath: parametersToJsonPath(path, method),
+            replacement: suggestedParam,
+            specChanges: [
+              {
+                operation: 'add',
+                path: parametersToJsonPath(path, method),
+                value: suggestedParam,
+              },
+            ],
           },
         })
       );

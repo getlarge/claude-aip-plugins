@@ -13,6 +13,7 @@ import {
   isCollectionEndpoint,
   hasParameter,
   getResponseSchema,
+  responseSchemaToJsonPath,
 } from '../helpers/index.js';
 
 /**
@@ -72,6 +73,8 @@ export class ResponseNextTokenRule extends OperationRule {
       'cursor' in props;
 
     if (!hasNextToken) {
+      const suggestedField = { type: 'string', nullable: true };
+      const schemaJsonPath = responseSchemaToJsonPath(path, method, '200');
       findings.push(
         ctx.createFinding({
           path: `${method} ${path}`,
@@ -80,8 +83,21 @@ export class ResponseNextTokenRule extends OperationRule {
             'Add next_page_token (string, nullable) to response schema',
           context: {
             suggestedField: {
-              next_page_token: { type: 'string', nullable: true },
+              next_page_token: suggestedField,
             },
+          },
+          fix: {
+            type: 'add-schema-property',
+            jsonPath: schemaJsonPath,
+            target: { propertyName: 'next_page_token' },
+            replacement: suggestedField,
+            specChanges: [
+              {
+                operation: 'set',
+                path: `${schemaJsonPath}.properties['next_page_token']`,
+                value: suggestedField,
+              },
+            ],
           },
         })
       );

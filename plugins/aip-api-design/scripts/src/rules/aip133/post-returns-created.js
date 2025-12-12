@@ -9,6 +9,7 @@
  */
 
 import { OperationRule } from '../base.js';
+import { responsesToJsonPath, responseToJsonPath } from '../helpers/index.js';
 
 /**
  * Rule: POST should return 201 Created or 202 Accepted
@@ -54,6 +55,20 @@ export class PostReturnsCreatedRule extends OperationRule {
             'POST returns 200. Consider 201 (Created) for sync or 202 (Accepted) for async.',
           suggestion:
             'Use 201 when resource is created immediately, 202 for async creation',
+          fix: {
+            type: 'change-status-code',
+            jsonPath: responsesToJsonPath(path, method),
+            target: { currentCode: '200', suggestedCode: '201' },
+            replacement: '201',
+            specChanges: [
+              {
+                operation: 'rename-key',
+                path: responsesToJsonPath(path, method),
+                from: '200',
+                to: '201',
+              },
+            ],
+          },
         })
       );
     }

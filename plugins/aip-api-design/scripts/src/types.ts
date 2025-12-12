@@ -18,6 +18,61 @@ export type RuleCategory =
   | 'versioning'
   | 'security';
 
+// ============================================
+// Machine-Readable Fix Types
+// ============================================
+
+/** Types of automated fixes that can be applied to an OpenAPI spec */
+export type FixType =
+  | 'rename-path-segment' // Rename a segment in a path (e.g., /user -> /users)
+  | 'rename-parameter' // Rename a path/query/header parameter
+  | 'add-parameter' // Add a single query/header/path parameter
+  | 'add-parameters' // Add multiple parameters at once
+  | 'remove-request-body' // Remove requestBody from an operation
+  | 'change-status-code' // Change a response status code
+  | 'add-operation' // Add a new HTTP method to a path
+  | 'add-schema' // Add a schema to components/schemas
+  | 'add-schema-property' // Add a property to an existing schema
+  | 'add-response' // Add a response to an operation
+  | 'set-schema-constraint'; // Set max/min/pattern constraint on a schema
+
+/** Types of JSON operations for spec changes */
+export type SpecChangeOperation = 'rename-key' | 'set' | 'add' | 'remove' | 'merge';
+
+/**
+ * A single atomic change to the OpenAPI spec.
+ * Used by Phase 4 auto-fixer to apply modifications.
+ */
+export interface SpecChange {
+  /** Type of JSON operation to perform */
+  operation: SpecChangeOperation;
+  /** JSONPath to the location (parent for add, target for set/remove) */
+  path: string;
+  /** For rename-key: old key name */
+  from?: string;
+  /** For rename-key/add: new key name or value location */
+  to?: string;
+  /** Value to set/add/merge */
+  value?: unknown;
+}
+
+/**
+ * Machine-readable fix for automated application.
+ * Enables IDE integrations and automated spec modification.
+ */
+export interface Fix {
+  /** Type of fix operation */
+  type: FixType;
+  /** JSONPath to the element being modified */
+  jsonPath: string;
+  /** Target-specific data (varies by fix type) */
+  target?: Record<string, unknown>;
+  /** New value or replacement */
+  replacement?: unknown;
+  /** Atomic spec changes for Phase 4 auto-fixer */
+  specChanges: SpecChange[];
+}
+
 /**
  * A single finding from the review process
  */
@@ -40,6 +95,8 @@ export interface Finding {
   jsonPath?: string;
   /** Additional context for framework-specific fixers */
   context?: Record<string, unknown>;
+  /** Machine-readable fix for automated application */
+  fix?: Fix;
 }
 
 /**

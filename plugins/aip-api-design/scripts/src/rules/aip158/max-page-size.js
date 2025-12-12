@@ -9,6 +9,7 @@
  */
 
 import { ParameterRule } from '../base.js';
+import { parametersToJsonPath } from '../helpers/index.js';
 
 /**
  * Rule: Page size should have a maximum
@@ -46,11 +47,26 @@ export class MaxPageSizeRule extends ParameterRule {
     if (method !== 'GET') return findings;
 
     if (param.schema && param.schema.maximum === undefined) {
+      // Find the index of this parameter in the operation
+      const paramJsonPath = `${parametersToJsonPath(path, method)}[?(@.name=='${param.name}')].schema`;
       findings.push(
         ctx.createFinding({
           path: `${method} ${path}`,
           message: `Parameter '${param.name}' has no maximum value`,
           suggestion: 'Add maximum: 100 (or appropriate limit) to schema',
+          fix: {
+            type: 'set-schema-constraint',
+            jsonPath: paramJsonPath,
+            target: { paramName: param.name, constraint: 'maximum' },
+            replacement: 100,
+            specChanges: [
+              {
+                operation: 'set',
+                path: `${paramJsonPath}.maximum`,
+                value: 100,
+              },
+            ],
+          },
         })
       );
     }

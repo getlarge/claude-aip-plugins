@@ -9,6 +9,7 @@
  */
 
 import { OperationRule } from '../base.js';
+import { responsesToJsonPath } from '../helpers/index.js';
 
 // Standard error codes per AIP-193
 const STANDARD_CLIENT_ERRORS = new Set([
@@ -68,12 +69,28 @@ export class StandardErrorCodesRule extends OperationRule {
         continue;
 
       if (!ALL_STANDARD.has(code)) {
+        // Suggest the closest standard code
+        const suggestedCode = code.startsWith('4') ? '400' : '500';
         findings.push(
           ctx.createFinding({
             path: `${method} ${path}`,
             message: `Non-standard error code ${code}`,
             suggestion: `Use standard codes: 400, 401, 403, 404, 409, 422, 429 (client) or 500, 503 (server)`,
             context: { code, standardCodes: [...ALL_STANDARD] },
+            fix: {
+              type: 'change-status-code',
+              jsonPath: responsesToJsonPath(path, method),
+              target: { currentCode: code, suggestedCode },
+              replacement: suggestedCode,
+              specChanges: [
+                {
+                  operation: 'rename-key',
+                  path: responsesToJsonPath(path, method),
+                  from: code,
+                  to: suggestedCode,
+                },
+              ],
+            },
           })
         );
       }

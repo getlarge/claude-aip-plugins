@@ -33,3 +33,19 @@ export {
   resolveRef,
   getResponseSchema,
 } from './spec-utils.js';
+
+// JSONPath utilities
+export {
+  pathToJsonPath,
+  operationToJsonPath,
+  parametersToJsonPath,
+  pathParametersToJsonPath,
+  requestBodyToJsonPath,
+  responseToJsonPath,
+  responsesToJsonPath,
+  schemaToJsonPath,
+  schemasContainerJsonPath,
+  schemaPropertyToJsonPath,
+  responseSchemaToJsonPath,
+  computeRenamedPath,
+} from './jsonpath.js';

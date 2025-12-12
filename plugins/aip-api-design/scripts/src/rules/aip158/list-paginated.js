@@ -9,7 +9,11 @@
  */
 
 import { OperationRule } from '../base.js';
-import { isCollectionEndpoint, hasParameter } from '../helpers/index.js';
+import {
+  isCollectionEndpoint,
+  hasParameter,
+  parametersToJsonPath,
+} from '../helpers/index.js';
 
 /**
  * Rule: List endpoints should have pagination
@@ -54,6 +58,22 @@ export class ListPaginatedRule extends OperationRule {
       hasParameter(operation, 'offset');
 
     if (!hasPageSize && !hasPageToken) {
+      const suggestedParams = [
+        {
+          name: 'page_size',
+          in: 'query',
+          required: false,
+          schema: { type: 'integer', minimum: 1, maximum: 100 },
+          description: 'Maximum number of items to return per page',
+        },
+        {
+          name: 'page_token',
+          in: 'query',
+          required: false,
+          schema: { type: 'string' },
+          description: 'Token for fetching the next page of results',
+        },
+      ];
       findings.push(
         ctx.createFinding({
           path: `${method} ${path}`,
@@ -61,6 +81,18 @@ export class ListPaginatedRule extends OperationRule {
           suggestion: 'Add page_size and page_token query parameters',
           context: {
             suggestedParams: ['page_size', 'page_token'],
+          },
+          fix: {
+            type: 'add-parameters',
+            jsonPath: parametersToJsonPath(path, method),
+            replacement: suggestedParams,
+            specChanges: [
+              {
+                operation: 'merge',
+                path: parametersToJsonPath(path, method),
+                value: suggestedParams,
+              },
+            ],
           },
         })
       );

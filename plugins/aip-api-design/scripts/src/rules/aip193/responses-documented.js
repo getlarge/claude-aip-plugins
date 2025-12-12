@@ -9,6 +9,7 @@
  */
 
 import { OperationRule } from '../base.js';
+import { responsesToJsonPath, responseToJsonPath } from '../helpers/index.js';
 
 /**
  * Rule: Error responses should be documented
@@ -42,11 +43,32 @@ export class ErrorResponsesDocumentedRule extends OperationRule {
     );
 
     if (errorCodes.length === 0 && !responses.default) {
+      const defaultErrorResponse = {
+        description: 'Error response',
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/Error' },
+          },
+        },
+      };
       findings.push(
         ctx.createFinding({
           path: `${method} ${path}`,
           message: 'No error responses documented',
           suggestion: 'Add 4xx/5xx responses or a default error response',
+          fix: {
+            type: 'add-response',
+            jsonPath: responsesToJsonPath(path, method),
+            target: { statusCode: 'default' },
+            replacement: defaultErrorResponse,
+            specChanges: [
+              {
+                operation: 'set',
+                path: responseToJsonPath(path, method, 'default'),
+                value: defaultErrorResponse,
+              },
+            ],
+          },
         })
       );
     }

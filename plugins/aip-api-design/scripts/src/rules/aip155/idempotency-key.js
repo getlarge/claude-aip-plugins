@@ -9,6 +9,7 @@
  */
 
 import { OperationRule } from '../base.js';
+import { parametersToJsonPath } from '../helpers/index.js';
 
 /**
  * Rule: POST should support Idempotency-Key header
@@ -51,20 +52,31 @@ export class IdempotencyKeyRule extends OperationRule {
     );
 
     if (!hasIdempotencyKey) {
+      const suggestedParam = {
+        name: 'Idempotency-Key',
+        in: 'header',
+        required: false,
+        schema: { type: 'string' },
+        description: 'Unique key for idempotent requests (UUID recommended)',
+      };
       findings.push(
         ctx.createFinding({
           path: `${method} ${path}`,
           message: 'POST endpoint missing Idempotency-Key header',
           suggestion:
             'Add optional Idempotency-Key header parameter for safe retries',
-          context: {
-            suggestedParam: {
-              name: 'Idempotency-Key',
-              in: 'header',
-              required: false,
-              schema: { type: 'string' },
-              description: 'Unique key for idempotent requests',
-            },
+          context: { suggestedParam },
+          fix: {
+            type: 'add-parameter',
+            jsonPath: parametersToJsonPath(path, method),
+            replacement: suggestedParam,
+            specChanges: [
+              {
+                operation: 'add',
+                path: parametersToJsonPath(path, method),
+                value: suggestedParam,
+              },
+            ],
           },
         })
       );
