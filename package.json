@@ -11,7 +11,7 @@
     "format:check": "prettier --check .",
     "lint": "npm run lint --prefix plugins/aip-api-design/scripts",
     "typecheck": "npm run typecheck --prefix plugins/aip-api-design/scripts",
-    "prepare": "husky"
+    "prepare": "test \"$HUSKY\" = \"0\" || husky"
   },
   "devDependencies": {
     "husky": "^9.1.7",
