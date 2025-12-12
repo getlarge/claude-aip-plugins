@@ -30,6 +30,7 @@ import {
   formatMarkdown,
   formatJSON,
   formatSARIF,
+  formatSummary,
 } from './formatters.js';
 import { OpenAPIFixer } from './fixer.js';
 
@@ -50,6 +51,7 @@ const argsConfig = {
     fix: { type: 'boolean', short: 'F', default: false },
     output: { type: 'string', short: 'o' },
     'dry-run': { type: 'boolean', default: false },
+    'from-json': { type: 'string', short: 'j' },
   },
   allowPositionals: true,
   strict: false,
@@ -66,6 +68,7 @@ const argsConfig = {
  * @property {boolean} [fix]
  * @property {string} [output]
  * @property {boolean} [dry-run]
+ * @property {string} [from-json]
  */
 
 /**
@@ -89,13 +92,14 @@ function parseArgs(args) {
       fix: v.fix ?? false,
       output: v.output,
       dryRun: v['dry-run'] ?? false,
+      fromJson: v['from-json'],
     },
   };
 }
 
 /**
  * @typedef {Object} CLIOptions
- * @property {'console' | 'json' | 'markdown' | 'sarif'} format
+ * @property {'console' | 'json' | 'markdown' | 'sarif' | 'summary'} format
  * @property {boolean} strict
  * @property {string[]} categories
  * @property {string[]} skipRules
@@ -104,6 +108,7 @@ function parseArgs(args) {
  * @property {boolean} fix
  * @property {string} [output]
  * @property {boolean} dryRun
+ * @property {string} [fromJson]
  */
 
 /**
@@ -123,13 +128,14 @@ ARGUMENTS:
 OPTIONS:
   -h, --help          Show this help message
   -s, --strict        Treat warnings as errors
-  -f, --format <fmt>  Output format: console (default), json, markdown, sarif
+  -f, --format <fmt>  Output format: console (default), json, markdown, sarif, summary
   -c, --category <c>  Only run rules in category (can repeat)
   -x, --skip <rule>   Skip specific rule by ID (can repeat)
   --no-color          Disable colored output
   -F, --fix           Apply fixes to the spec and write output
   -o, --output <path> Output path for fixed spec (default: <spec>.fixed.<ext>)
   --dry-run           Show what fixes would be applied without writing
+  -j, --from-json <f> Re-format existing JSON review output (skip re-running review)
 
 CATEGORIES:
   naming              Resource naming conventions (AIP-122, AIP-123)
@@ -262,9 +268,14 @@ function getDefaultOutputPath(specPath) {
 async function main(args) {
   const { specPath, options } = parseArgs(args);
 
-  if (options.help || !specPath) {
+  if (options.help || (!specPath && !options.fromJson)) {
     printHelp();
     return options.help ? 0 : 2;
+  }
+
+  // Handle --from-json: re-format existing review JSON
+  if (options.fromJson) {
+    return handleFromJson(options);
   }
 
   // Load spec
@@ -308,6 +319,60 @@ async function main(args) {
       break;
     case 'sarif':
       output = formatSARIF(result);
+      break;
+    case 'summary':
+      output = formatSummary(result);
+      break;
+    case 'console':
+    default:
+      output = formatConsole(result, !options.noColor && process.stdout.isTTY);
+      break;
+  }
+
+  console.log(output);
+
+  // Exit code based on findings
+  if (result.summary.errors > 0) {
+    return 1;
+  }
+
+  return 0;
+}
+
+/**
+ * Handle --from-json: re-format existing review JSON output
+ * @param {CLIOptions} options
+ * @returns {number}
+ */
+function handleFromJson(options) {
+  const jsonPath = /** @type {string} */ (options.fromJson);
+
+  // Load JSON review result
+  /** @type {import('./types.ts').ReviewResult} */
+  let result;
+  try {
+    const content = readFileSync(resolve(jsonPath), 'utf-8');
+    result = JSON.parse(content);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Error loading JSON: ${message}`);
+    return 2;
+  }
+
+  // Format and output
+  let output;
+  switch (options.format) {
+    case 'json':
+      output = formatJSON(result);
+      break;
+    case 'markdown':
+      output = formatMarkdown(result);
+      break;
+    case 'sarif':
+      output = formatSARIF(result);
+      break;
+    case 'summary':
+      output = formatSummary(result);
       break;
     case 'console':
     default:

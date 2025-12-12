@@ -450,3 +450,131 @@ const noColors = {
   blue: '',
   cyan: '',
 };
+
+/**
+ * Format result as a condensed summary (context-efficient)
+ * @param {ReviewResult} result
+ * @returns {string}
+ */
+export function formatSummary(result) {
+  const lines = [];
+
+  // Header
+  lines.push(`## API Review: ${result.specTitle || result.specPath}`);
+  lines.push('');
+  lines.push(`**Spec:** \`${result.specPath}\``);
+  if (result.specVersion) {
+    lines.push(`**Version:** ${result.specVersion}`);
+  }
+  lines.push(`**Reviewed:** ${result.metadata.reviewedAt}`);
+  lines.push('');
+
+  // Summary counts with emojis
+  lines.push('### Summary');
+  lines.push('');
+  lines.push('| Severity | Count |');
+  lines.push('|----------|-------|');
+  lines.push(`| 🔴 Errors | ${result.summary.errors} |`);
+  lines.push(`| 🟡 Warnings | ${result.summary.warnings} |`);
+  lines.push(`| 💡 Suggestions | ${result.summary.suggestions} |`);
+  lines.push(`| **Total** | **${result.findings.length}** |`);
+  lines.push('');
+
+  // Group findings by rule and count
+  /** @type {Record<string, {count: number, severity: string, aip: string|undefined, category: string, samples: Array<{path: string, message: string}>}>} */
+  const byRule = {};
+  for (const f of result.findings) {
+    if (!byRule[f.ruleId]) {
+      byRule[f.ruleId] = {
+        count: 0,
+        severity: f.severity,
+        aip: f.aip,
+        category: f.category,
+        samples: [],
+      };
+    }
+    byRule[f.ruleId].count++;
+    // Keep sample paths for error grouping
+    if (byRule[f.ruleId].samples.length < 10) {
+      byRule[f.ruleId].samples.push({ path: f.path, message: f.message });
+    }
+  }
+
+  // Sort by count descending
+  const sortedRules = Object.entries(byRule).sort(
+    (a, b) => b[1].count - a[1].count
+  );
+
+  // Top rules table
+  lines.push('### Findings by Rule (sorted by count)');
+  lines.push('');
+  lines.push('| Rule | Count | Severity | AIP |');
+  lines.push('|------|-------|----------|-----|');
+  for (const [ruleId, info] of sortedRules) {
+    lines.push(
+      `| \`${ruleId}\` | ${info.count} | ${info.severity} | ${info.aip || '-'} |`
+    );
+  }
+  lines.push('');
+
+  // Critical issues - group by rule for clarity
+  const errorRules = sortedRules.filter(
+    ([, info]) => info.severity === 'error'
+  );
+  if (errorRules.length > 0) {
+    lines.push('### Critical Issues (Errors)');
+    lines.push('');
+
+    for (const [, info] of errorRules) {
+      // Extract common pattern from message for grouping description
+      const sampleMessage = info.samples[0]?.message || '';
+      const ruleDescription = sampleMessage.split('.')[0]; // First sentence
+
+      lines.push(`**${info.count} issues:** ${ruleDescription} (${info.aip})`);
+      for (const sample of info.samples.slice(0, 7)) {
+        lines.push(`- \`${sample.path}\``);
+      }
+      if (info.count > 7) {
+        lines.push(`- ... and ${info.count - 7} more`);
+      }
+      lines.push('');
+    }
+  }
+
+  // High-impact warnings (top 3 warning rules by count)
+  const warningRules = sortedRules
+    .filter(([, info]) => info.severity === 'warning')
+    .slice(0, 3);
+  if (warningRules.length > 0) {
+    lines.push('### High-Impact Warnings');
+    lines.push('');
+    for (const [ruleId, info] of warningRules) {
+      const sampleMessage = info.samples[0]?.message || '';
+      lines.push(
+        `- **${info.count}x** \`${ruleId}\`: ${sampleMessage.split('.')[0]} (${info.aip})`
+      );
+    }
+    lines.push('');
+  }
+
+  // Next step recommendation
+  lines.push('### Next Step');
+  lines.push('');
+  if (result.summary.errors > 0) {
+    lines.push(
+      'Run the review command with `--fix` to apply suggested fixes automatically.'
+    );
+  } else if (result.summary.warnings > 0) {
+    lines.push(
+      'Run the review command with `--fix` to apply suggested fixes automatically.'
+    );
+  } else if (result.summary.suggestions > 0) {
+    lines.push(
+      'The API follows AIP principles well. Review suggestions for further improvements.'
+    );
+  } else {
+    lines.push('No issues found. The API follows AIP principles.');
+  }
+
+  return lines.join('\n');
+}

@@ -5,7 +5,12 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatMarkdown, formatJSON, formatSARIF } from './formatters.js';
+import {
+  formatMarkdown,
+  formatJSON,
+  formatSARIF,
+  formatSummary,
+} from './formatters.js';
 
 /**
  * Create a mock review result for testing
@@ -344,5 +349,213 @@ describe('formatSARIF', () => {
     assert.ok(levels.includes('error'));
     assert.ok(levels.includes('warning'));
     assert.ok(levels.includes('note')); // suggestion -> note
+  });
+});
+
+// ============================================
+// formatSummary Tests
+// ============================================
+
+describe('formatSummary', () => {
+  it('includes header with spec info', () => {
+    const result = createMockResult();
+    const output = formatSummary(result);
+
+    assert.ok(output.includes('## API Review: Test API'));
+    assert.ok(output.includes('**Spec:** `test-api.yaml`'));
+    assert.ok(output.includes('**Version:** 1.0.0'));
+  });
+
+  it('includes summary table with emojis', () => {
+    const result = createMockResult({
+      findings: [
+        createMockFinding({ severity: 'error' }),
+        createMockFinding({ severity: 'warning', ruleId: 'rule2' }),
+        createMockFinding({ severity: 'suggestion', ruleId: 'rule3' }),
+      ],
+      summary: { errors: 1, warnings: 1, suggestions: 1 },
+    });
+    const output = formatSummary(result);
+
+    assert.ok(output.includes('### Summary'));
+    assert.ok(output.includes('| 🔴 Errors | 1 |'));
+    assert.ok(output.includes('| 🟡 Warnings | 1 |'));
+    assert.ok(output.includes('| 💡 Suggestions | 1 |'));
+    assert.ok(output.includes('| **Total** | **3** |'));
+  });
+
+  it('includes findings by rule table', () => {
+    const result = createMockResult({
+      findings: [
+        createMockFinding({ severity: 'warning', ruleId: 'rule1' }),
+        createMockFinding({ severity: 'warning', ruleId: 'rule1' }),
+        createMockFinding({ severity: 'error', ruleId: 'rule2' }),
+      ],
+      summary: { errors: 1, warnings: 2, suggestions: 0 },
+    });
+    const output = formatSummary(result);
+
+    assert.ok(output.includes('### Findings by Rule (sorted by count)'));
+    assert.ok(output.includes('| `rule1` | 2 | warning |'));
+    assert.ok(output.includes('| `rule2` | 1 | error |'));
+  });
+
+  it('sorts rules by count descending', () => {
+    const result = createMockResult({
+      findings: [
+        createMockFinding({ severity: 'warning', ruleId: 'less-common' }),
+        createMockFinding({ severity: 'warning', ruleId: 'most-common' }),
+        createMockFinding({ severity: 'warning', ruleId: 'most-common' }),
+        createMockFinding({ severity: 'warning', ruleId: 'most-common' }),
+      ],
+      summary: { errors: 0, warnings: 4, suggestions: 0 },
+    });
+    const output = formatSummary(result);
+
+    const mostCommonIndex = output.indexOf('most-common');
+    const lessCommonIndex = output.indexOf('less-common');
+    assert.ok(
+      mostCommonIndex < lessCommonIndex,
+      'most-common should appear before less-common'
+    );
+  });
+
+  it('includes critical issues section for errors', () => {
+    const result = createMockResult({
+      findings: [
+        createMockFinding({
+          severity: 'error',
+          ruleId: 'aip122/no-verbs',
+          path: '/v1/check-updates',
+          message: "Path contains verb 'check-updates'",
+          aip: 'AIP-131',
+        }),
+      ],
+      summary: { errors: 1, warnings: 0, suggestions: 0 },
+    });
+    const output = formatSummary(result);
+
+    assert.ok(output.includes('### Critical Issues (Errors)'));
+    assert.ok(output.includes('`/v1/check-updates`'));
+  });
+
+  it('includes high-impact warnings section', () => {
+    const result = createMockResult({
+      findings: [
+        createMockFinding({
+          severity: 'warning',
+          ruleId: 'aip158/list-paginated',
+          message: 'List endpoint missing pagination',
+        }),
+        createMockFinding({
+          severity: 'warning',
+          ruleId: 'aip158/list-paginated',
+          message: 'List endpoint missing pagination',
+        }),
+      ],
+      summary: { errors: 0, warnings: 2, suggestions: 0 },
+    });
+    const output = formatSummary(result);
+
+    assert.ok(output.includes('### High-Impact Warnings'));
+    assert.ok(output.includes('**2x** `aip158/list-paginated`'));
+  });
+
+  it('includes next step recommendation for errors', () => {
+    const result = createMockResult({
+      findings: [createMockFinding({ severity: 'error' })],
+      summary: { errors: 1, warnings: 0, suggestions: 0 },
+    });
+    const output = formatSummary(result);
+
+    assert.ok(output.includes('### Next Step'));
+    assert.ok(output.includes('--fix'));
+  });
+
+  it('includes next step recommendation for warnings only', () => {
+    const result = createMockResult({
+      findings: [createMockFinding({ severity: 'warning' })],
+      summary: { errors: 0, warnings: 1, suggestions: 0 },
+    });
+    const output = formatSummary(result);
+
+    assert.ok(output.includes('### Next Step'));
+    assert.ok(output.includes('--fix'));
+  });
+
+  it('includes positive message for suggestions only', () => {
+    const result = createMockResult({
+      findings: [createMockFinding({ severity: 'suggestion' })],
+      summary: { errors: 0, warnings: 0, suggestions: 1 },
+    });
+    const output = formatSummary(result);
+
+    assert.ok(output.includes('follows AIP principles well'));
+  });
+
+  it('includes positive message when no issues', () => {
+    const result = createMockResult({
+      findings: [],
+      summary: { errors: 0, warnings: 0, suggestions: 0 },
+    });
+    const output = formatSummary(result);
+
+    assert.ok(output.includes('No issues found'));
+  });
+
+  it('produces compact output under 5KB for many findings', () => {
+    // Create 100 findings across 10 rules
+    const findings = [];
+    for (let i = 0; i < 100; i++) {
+      findings.push(
+        createMockFinding({
+          ruleId: `rule${i % 10}`,
+          path: `/path${i}`,
+          severity:
+            i % 3 === 0 ? 'error' : i % 3 === 1 ? 'warning' : 'suggestion',
+        })
+      );
+    }
+
+    const result = createMockResult({
+      findings,
+      summary: { errors: 34, warnings: 33, suggestions: 33 },
+    });
+    const output = formatSummary(result);
+
+    // Should be under 5KB
+    assert.ok(
+      output.length < 5000,
+      `Output is ${output.length} bytes, expected under 5000`
+    );
+  });
+
+  it('limits sample paths in critical issues section', () => {
+    // Create 20 errors with the same rule
+    const findings = [];
+    for (let i = 0; i < 20; i++) {
+      findings.push(
+        createMockFinding({
+          severity: 'error',
+          ruleId: 'aip122/no-verbs',
+          path: `/path${i}`,
+          message: 'Path contains verb',
+        })
+      );
+    }
+
+    const result = createMockResult({
+      findings,
+      summary: { errors: 20, warnings: 0, suggestions: 0 },
+    });
+    const output = formatSummary(result);
+
+    // Should show at most 7 paths + "and X more"
+    const pathMatches = output.match(/`\/path\d+`/g);
+    assert.ok(
+      pathMatches.length <= 7,
+      `Expected at most 7 paths, got ${pathMatches.length}`
+    );
+    assert.ok(output.includes('... and 13 more'));
   });
 });
