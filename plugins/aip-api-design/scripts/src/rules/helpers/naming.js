@@ -51,6 +51,14 @@ export const CUSTOM_METHOD_VERBS = new Set([
  * @type {Set<string>}
  */
 export const NOUN_EXCEPTIONS = new Set([
+  // Words starting with "add-"
+  'address',
+  'addresses',
+  'addendum',
+  'addenda',
+  'addition',
+  'additions',
+  // Words starting with "check-"
   'checklist',
   'checklists',
   'checkout',
@@ -61,6 +69,21 @@ export const NOUN_EXCEPTIONS = new Set([
   'checksums',
   'checkpoint',
   'checkpoints',
+  // Words starting with "process-"
+  'process',
+  'processes', // as noun: "the process"
+  // Words starting with "run-"
+  'runtime',
+  'runtimes',
+  'runbook',
+  'runbooks',
+  // Words starting with "send-"
+  'sender',
+  'senders',
+  // Words starting with "submit-"
+  'submission',
+  'submissions',
+  // Verb-noun homographs (words that can be both verb and noun)
   'update',
   'updates', // as noun: "the update"
   'search',
@@ -71,6 +94,12 @@ export const NOUN_EXCEPTIONS = new Set([
   'uploads',
   'listing',
   'listings',
+  'insert',
+  'inserts', // as noun: "the database insert"
+  'edit',
+  'edits', // as noun: "the edit history"
+  'fetch',
+  'fetches', // as noun: "the fetch operation"
 ]);
 
 /**

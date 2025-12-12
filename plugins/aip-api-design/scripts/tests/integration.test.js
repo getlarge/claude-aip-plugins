@@ -177,6 +177,15 @@ describe('Acme Commerce API - Integration Tests', () => {
       assert.ok(matches.length > 0, 'Should flag POST returning 200');
     });
 
+    it('flags POST /products/search returning 200', () => {
+      // Note: POST for search is itself questionable (should be GET with query params)
+      // but the rule correctly flags the 200 response regardless
+      const matches = findByRule(findings, 'aip133/post-returns-201').filter(
+        (f) => f.path === 'POST /products/search'
+      );
+      assert.ok(matches.length > 0, 'Should flag POST search returning 200');
+    });
+
     it('does NOT flag POST /customers returning 201', () => {
       const matches = findByRule(findings, 'aip133/post-returns-201').filter(
         (f) => f.path === 'POST /customers'
