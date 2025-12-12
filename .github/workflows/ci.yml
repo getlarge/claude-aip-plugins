@@ -87,36 +87,32 @@ jobs:
 
       - name: Test JSON output format
         run: |
-          set -euo pipefail
-          node ${{ env.OPENAPI_REVIEWER_DIR }}/src/cli.js ${{ env.OPENAPI_REVIEWER_DIR }}/tests/fixtures/acme-commerce.yaml --format json | tee /tmp/output.json
+          # CLI exits non-zero when findings have errors, which is expected
+          node ${{ env.OPENAPI_REVIEWER_DIR }}/src/cli.js ${{ env.OPENAPI_REVIEWER_DIR }}/tests/fixtures/acme-commerce.yaml --format json > /tmp/output.json || true
           jq -e '.findings | length > 0' /tmp/output.json || (echo "Expected findings in JSON output" && exit 1)
           echo "JSON format: OK"
 
       - name: Test markdown output format
         run: |
-          set -euo pipefail
-          node ${{ env.OPENAPI_REVIEWER_DIR }}/src/cli.js ${{ env.OPENAPI_REVIEWER_DIR }}/tests/fixtures/acme-commerce.yaml --format markdown | tee /tmp/output.md
+          node ${{ env.OPENAPI_REVIEWER_DIR }}/src/cli.js ${{ env.OPENAPI_REVIEWER_DIR }}/tests/fixtures/acme-commerce.yaml --format markdown > /tmp/output.md || true
           grep -q "## Summary" /tmp/output.md || (echo "Expected Summary section in markdown" && exit 1)
           echo "Markdown format: OK"
 
       - name: Test console output format
         run: |
-          set -euo pipefail
-          node ${{ env.OPENAPI_REVIEWER_DIR }}/src/cli.js ${{ env.OPENAPI_REVIEWER_DIR }}/tests/fixtures/acme-commerce.yaml --format console | tee /tmp/output.txt
+          node ${{ env.OPENAPI_REVIEWER_DIR }}/src/cli.js ${{ env.OPENAPI_REVIEWER_DIR }}/tests/fixtures/acme-commerce.yaml --format console > /tmp/output.txt || true
           grep -q "findings" /tmp/output.txt || (echo "Expected findings in console output" && exit 1)
           echo "Console format: OK"
 
       - name: Test SARIF output format
         run: |
-          set -euo pipefail
-          node ${{ env.OPENAPI_REVIEWER_DIR }}/src/cli.js ${{ env.OPENAPI_REVIEWER_DIR }}/tests/fixtures/acme-commerce.yaml --format sarif | tee /tmp/output.sarif
+          node ${{ env.OPENAPI_REVIEWER_DIR }}/src/cli.js ${{ env.OPENAPI_REVIEWER_DIR }}/tests/fixtures/acme-commerce.yaml --format sarif > /tmp/output.sarif || true
           jq -e '.runs[0].results | length > 0' /tmp/output.sarif || (echo "Expected results in SARIF output" && exit 1)
           echo "SARIF format: OK"
 
       - name: Test category filtering
         run: |
-          set -euo pipefail
-          node ${{ env.OPENAPI_REVIEWER_DIR }}/src/cli.js ${{ env.OPENAPI_REVIEWER_DIR }}/tests/fixtures/acme-commerce.yaml --format json -c naming | tee /tmp/output.json
+          node ${{ env.OPENAPI_REVIEWER_DIR }}/src/cli.js ${{ env.OPENAPI_REVIEWER_DIR }}/tests/fixtures/acme-commerce.yaml --format json -c naming > /tmp/output.json || true
           categories=$(jq -r '.findings[].category' /tmp/output.json | sort -u)
           if echo "$categories" | grep -qv "naming"; then
             echo "Expected only naming category findings"
@@ -126,13 +122,12 @@ jobs:
 
       - name: Test rule skipping
         run: |
-          set -euo pipefail
           # Get count without skipping
-          node ${{ env.OPENAPI_REVIEWER_DIR }}/src/cli.js ${{ env.OPENAPI_REVIEWER_DIR }}/tests/fixtures/acme-commerce.yaml --format json | tee /tmp/all.json
+          node ${{ env.OPENAPI_REVIEWER_DIR }}/src/cli.js ${{ env.OPENAPI_REVIEWER_DIR }}/tests/fixtures/acme-commerce.yaml --format json > /tmp/all.json || true
           count_all=$(jq '.findings | length' /tmp/all.json)
 
           # Get count with skipping a rule
-          node ${{ env.OPENAPI_REVIEWER_DIR }}/src/cli.js ${{ env.OPENAPI_REVIEWER_DIR }}/tests/fixtures/acme-commerce.yaml --format json -x aip122/plural-resources | tee /tmp/skip.json
+          node ${{ env.OPENAPI_REVIEWER_DIR }}/src/cli.js ${{ env.OPENAPI_REVIEWER_DIR }}/tests/fixtures/acme-commerce.yaml --format json -x aip122/plural-resources > /tmp/skip.json || true
           count_skip=$(jq '.findings | length' /tmp/skip.json)
 
           if [ "$count_skip" -ge "$count_all" ]; then
@@ -143,12 +138,11 @@ jobs:
 
       - name: Test strict mode
         run: |
-          set -euo pipefail
           # In strict mode, warnings become errors
-          node ${{ env.OPENAPI_REVIEWER_DIR }}/src/cli.js ${{ env.OPENAPI_REVIEWER_DIR }}/tests/fixtures/acme-commerce.yaml --format json | tee /tmp/normal.json
+          node ${{ env.OPENAPI_REVIEWER_DIR }}/src/cli.js ${{ env.OPENAPI_REVIEWER_DIR }}/tests/fixtures/acme-commerce.yaml --format json > /tmp/normal.json || true
           warnings=$(jq '[.findings[] | select(.severity == "warning")] | length' /tmp/normal.json)
 
-          node ${{ env.OPENAPI_REVIEWER_DIR }}/src/cli.js ${{ env.OPENAPI_REVIEWER_DIR }}/tests/fixtures/acme-commerce.yaml --format json --strict | tee /tmp/strict.json
+          node ${{ env.OPENAPI_REVIEWER_DIR }}/src/cli.js ${{ env.OPENAPI_REVIEWER_DIR }}/tests/fixtures/acme-commerce.yaml --format json --strict > /tmp/strict.json || true
           errors_strict=$(jq '[.findings[] | select(.severity == "error")] | length' /tmp/strict.json)
 
           if [ "$errors_strict" -lt "$warnings" ]; then
