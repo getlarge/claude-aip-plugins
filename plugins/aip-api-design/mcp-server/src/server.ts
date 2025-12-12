@@ -159,8 +159,10 @@ export async function createServer(config: ServerConfig = {}) {
   const sessions = new Sessions<StreamableHTTPServerTransport>();
 
   // Initialize temp storage for storing modified specs
+  // HTTP transport uses SQLite for multi-worker shared state
   const baseUrl = `http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`;
   await initTempStorage({
+    type: 'sqlite',
     baseUrl,
     ttlMs: 5 * 60 * 1000, // 5 minutes
   });

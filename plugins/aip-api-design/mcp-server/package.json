@@ -44,6 +44,6 @@
     "@getlarge/aip-openapi-reviewer": "*"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.5.0"
   }
 }
