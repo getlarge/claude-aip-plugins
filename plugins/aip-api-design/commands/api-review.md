@@ -21,38 +21,50 @@ Analyze an OpenAPI specification against Google's API Improvement Proposals (AIP
    - If no argument, check for recent discovery doc in `thoughts/api/discovery/`
    - If multiple specs in discovery, ask user which to review
 
-2. **Run the AIP reviewer script**:
+2. **Run the AIP reviewer once, generate all outputs efficiently**:
 
-   The plugin scripts are located at `${CLAUDE_PLUGIN_ROOT}`. Run:
+   The plugin scripts are located at `${CLAUDE_PLUGIN_ROOT}`. Run the review once, save JSON, then convert to other formats:
 
    ```bash
-   node "${CLAUDE_PLUGIN_ROOT}/scripts/src/cli.js" {spec-path} --format markdown
+   # Create output directory and unique temp file
+   mkdir -p thoughts/api/reviews
+   REVIEW_JSON=$(mktemp)
+
+   # Step 1: Run review once, save JSON (this is the expensive operation)
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/src/cli.js" {spec-path} --format json > "$REVIEW_JSON"
+
+   # Step 2: Convert JSON to full markdown and save to file
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/src/cli.js" --from-json "$REVIEW_JSON" --format markdown > thoughts/api/reviews/{YYYY-MM-DD}-{spec-name}-review.md
+
+   # Step 3: Convert JSON to summary for display (context-efficient)
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/src/cli.js" --from-json "$REVIEW_JSON" --format summary
+
+   # Step 4: Clean up temp file
+   rm "$REVIEW_JSON"
    ```
 
    If `CLAUDE_PLUGIN_ROOT` is not set, find the plugin directory first:
 
    ```bash
    PLUGIN_DIR=$(find ~/.claude/plugins -name "aip-api-design@*" -type d 2>/dev/null | head -1)
-   node "${PLUGIN_DIR}/scripts/src/cli.js" {spec-path} --format markdown
    ```
 
-   Optional flags:
+   Optional flags for the review step:
    - `--strict` or `-s`: Treat warnings as errors
-   - `--format markdown`: Output as markdown (default for this command)
-   - `--format json`: Machine-readable output
    - `-c naming -c pagination`: Only run specific categories
    - `-x naming/plural-resources`: Skip specific rules
 
-3. **Save the output** to:
+   Available formats:
+   - `--format json`: Machine-readable output (use as intermediate)
+   - `--format markdown`: Full detailed output (save to file)
+   - `--format summary`: Condensed output (display to user)
+   - `--format sarif`: For CI/CD integration
 
-   ```
-   thoughts/api/reviews/{YYYY-MM-DD}-{spec-name}-review.md
-   ```
+3. **Present the summary** directly to the user (it's already formatted for display)
 
-4. **Present summary to user**:
-   - Total findings by severity (errors, warnings, suggestions)
-   - Most critical issues
-   - Recommend next step: `/api-plan {review-path}`
+4. **Mention the full review location**:
+   - Tell user: "Full review saved to `thoughts/api/reviews/{filename}`"
+   - Recommend next step based on summary's "Next Step" section
 
 ## Supported Rules
 
