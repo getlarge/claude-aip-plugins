@@ -52,22 +52,33 @@ const argsConfig = {
 };
 
 /**
+ * @typedef {Object} ParsedValues
+ * @property {boolean} [help]
+ * @property {boolean} [strict]
+ * @property {string} [format]
+ * @property {string[]} [category]
+ * @property {string[]} [skip]
+ * @property {boolean} [no-color]
+ */
+
+/**
  * Parse command line arguments using Node.js built-in parseArgs
  * @param {string[]} args
  * @returns {{specPath: string, options: CLIOptions}}
  */
 function parseArgs(args) {
   const { values, positionals } = nodeParseArgs({ ...argsConfig, args });
+  const v = /** @type {ParsedValues} */ (values);
 
   return {
     specPath: positionals[0] ?? '',
     options: {
-      help: /** @type {boolean} */ (values.help),
-      strict: /** @type {boolean} */ (values.strict),
-      format: /** @type {CLIOptions['format']} */ (values.format),
-      categories: /** @type {string[]} */ (values.category),
-      skipRules: /** @type {string[]} */ (values.skip),
-      noColor: /** @type {boolean} */ (values['no-color']),
+      help: v.help ?? false,
+      strict: v.strict ?? false,
+      format: /** @type {CLIOptions['format']} */ (v.format ?? 'console'),
+      categories: v.category ?? [],
+      skipRules: v.skip ?? [],
+      noColor: v['no-color'] ?? false,
     },
   };
 }
@@ -136,9 +147,9 @@ EXIT CODES:
 /**
  * Load and parse spec file
  * @param {string} specPath
- * @returns {import('./types.js').OpenAPISpec}
+ * @returns {Promise<import('./types.js').OpenAPISpec>}
  */
-function loadSpec(specPath) {
+async function loadSpec(specPath) {
   const resolved = resolve(specPath);
 
   if (!existsSync(resolved)) {
@@ -159,8 +170,7 @@ function loadSpec(specPath) {
     return JSON.parse(content);
   } catch {
     // Fall back to yaml parsing
-    // Simple YAML parser for basic cases
-    return parseSimpleYAML(content);
+    return await parseSimpleYAML(content);
   }
 }
 
@@ -168,20 +178,18 @@ function loadSpec(specPath) {
  * Very simple YAML parser for basic OpenAPI specs
  * For production, use 'yaml' or 'js-yaml' package
  * @param {string} content
- * @returns {any}
+ * @returns {Promise<any>}
  */
-function parseSimpleYAML(content) {
-  // This is a placeholder - in production, use a proper YAML parser
-  // For now, try dynamic import
+async function parseSimpleYAML(content) {
+  // Try dynamic import for ES modules
   try {
-    // If yaml package is available
-    const yaml = require('yaml');
+    const yaml = await import('yaml');
     return yaml.parse(content);
   } catch {
     try {
-      // Try js-yaml
-      const jsYaml = require('js-yaml');
-      return jsYaml.load(content);
+      // @ts-expect-error - js-yaml doesn't have type declarations
+      const jsYaml = await import('js-yaml');
+      return jsYaml.default.load(content);
     } catch {
       throw new Error(
         'YAML parsing requires "yaml" or "js-yaml" package. Install with: npm install yaml'
@@ -206,9 +214,10 @@ async function main(args) {
   // Load spec
   let spec;
   try {
-    spec = loadSpec(specPath);
+    spec = await loadSpec(specPath);
   } catch (error) {
-    console.error(`Error loading spec: ${error.message}`);
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Error loading spec: ${message}`);
     return 2;
   }
 

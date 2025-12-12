@@ -18,7 +18,22 @@ function createMockResult(overrides = {}) {
     specTitle: 'Test API',
     specVersion: '1.0.0',
     findings: [],
-    summary: { errors: 0, warnings: 0, suggestions: 0 },
+    summary: {
+      errors: 0,
+      warnings: 0,
+      suggestions: 0,
+      byCategory: {
+        naming: 0,
+        'standard-methods': 0,
+        errors: 0,
+        pagination: 0,
+        filtering: 0,
+        lro: 0,
+        idempotency: 0,
+        versioning: 0,
+        security: 0,
+      },
+    },
     metadata: {
       reviewedAt: '2025-01-01T00:00:00.000Z',
       reviewerVersion: '2.0.0',
@@ -323,7 +338,7 @@ describe('formatSARIF', () => {
     const output = formatSARIF(result);
     const parsed = JSON.parse(output);
 
-    const levels = parsed.runs[0].results.map((r) => r.level);
+    const levels = parsed.runs[0].results.map((/** @type {{ level: string }} */ r) => r.level);
     assert.ok(levels.includes('error'));
     assert.ok(levels.includes('warning'));
     assert.ok(levels.includes('note')); // suggestion -> note

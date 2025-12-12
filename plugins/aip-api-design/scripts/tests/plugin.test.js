@@ -31,6 +31,7 @@ function parseFrontmatter(content) {
   const body = match[2];
 
   // Simple YAML parsing for key: value pairs
+  /** @type {Record<string, string>} */
   const frontmatter = {};
   for (const line of frontmatterText.split('\n')) {
     const colonIndex = line.indexOf(':');

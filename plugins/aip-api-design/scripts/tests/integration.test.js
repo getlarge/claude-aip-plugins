@@ -15,6 +15,7 @@ import { dirname, join } from 'node:path';
 import { OpenAPIReviewer } from '../src/reviewer.js';
 
 // Optional: yaml parser for YAML fixtures
+/** @type {typeof import('yaml') | undefined} */
 let yaml;
 try {
   yaml = await import('yaml');
@@ -499,6 +500,7 @@ describe('Acme Commerce API - Known Issues Breakdown', () => {
   });
 
   it('summarizes findings by rule', () => {
+    /** @type {Record<string, number>} */
     const byRule = {};
     for (const f of findings) {
       byRule[f.ruleId] = (byRule[f.ruleId] || 0) + 1;

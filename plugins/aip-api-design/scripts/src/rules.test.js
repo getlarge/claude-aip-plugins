@@ -17,9 +17,11 @@ function runRule(ruleId, spec) {
   const rule = getRuleById(ruleId);
   if (!rule) throw new Error(`Rule not found: ${ruleId}`);
 
+  /** @type {import('./types.js').RuleContext} */
   const ctx = {
     spec,
-    createFinding: (partial) => ({
+    // @ts-expect-error - path is provided by the partial in tests
+    createFinding: (/** @type {Partial<import('./types.js').Finding>} */ partial) => ({
       ruleId: rule.id,
       severity: rule.severity,
       category: rule.category,
@@ -113,7 +115,7 @@ describe('naming/nested-ownership', () => {
     const findings = runRule('naming/nested-ownership', spec);
     assert.equal(findings.length, 1);
     assert.ok(findings[0].message.includes("'{id}'"));
-    assert.ok(findings[0].suggestion.includes('orderId'));
+    assert.ok(findings[0].suggestion?.includes('orderId'));
   });
 
   it('passes descriptive parameter names', () => {

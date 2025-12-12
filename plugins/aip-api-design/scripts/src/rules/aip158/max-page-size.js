@@ -25,6 +25,7 @@ export class MaxPageSizeRule extends ParameterRule {
     });
 
     // Only check query parameters
+    /** @type {readonly string[]} */
     this.locations = ['query'];
   }
 
@@ -37,6 +38,7 @@ export class MaxPageSizeRule extends ParameterRule {
    * @returns {import('../../types.ts').Finding[]}
    */
   checkParameter(param, method, path, spec, ctx) {
+    /** @type {import('../../types.ts').Finding[]} */
     const findings = [];
 
     // Only check page size parameters

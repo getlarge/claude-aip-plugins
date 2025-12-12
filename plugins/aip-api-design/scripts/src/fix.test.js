@@ -111,9 +111,9 @@ describe('Fix objects', () => {
 
       assert.ok(pluralFinding, 'Should have plural-resources finding');
       assertValidFix(pluralFinding.fix, 'rename-path-segment');
-      assert.equal(pluralFinding.fix.replacement, 'users');
-      assert.equal(pluralFinding.fix.specChanges[0].from, '/user/{id}');
-      assert.equal(pluralFinding.fix.specChanges[0].to, '/users/{id}');
+      assert.equal(pluralFinding.fix?.replacement, 'users');
+      assert.equal(pluralFinding.fix?.specChanges[0].from, '/user/{id}');
+      assert.equal(pluralFinding.fix?.specChanges[0].to, '/users/{id}');
     });
   });
 
@@ -145,8 +145,10 @@ describe('Fix objects', () => {
 
       assert.ok(idempotencyFinding, 'Should have idempotency-key finding');
       assertValidFix(idempotencyFinding.fix, 'add-parameter');
-      assert.equal(idempotencyFinding.fix.replacement.name, 'Idempotency-Key');
-      assert.equal(idempotencyFinding.fix.replacement.in, 'header');
+      // @ts-expect-error - we know this is an add-parameter fix with replacement
+      assert.equal(idempotencyFinding.fix?.replacement?.name, 'Idempotency-Key');
+      // @ts-expect-error - we know this is an add-parameter fix with replacement
+      assert.equal(idempotencyFinding.fix?.replacement?.in, 'header');
     });
 
     it('should produce correct fix for missing filter parameter', () => {
@@ -157,7 +159,7 @@ describe('Fix objects', () => {
           '/users': {
             get: {
               parameters: [
-                { name: 'page_size', in: 'query', schema: { type: 'integer' } },
+                { name: 'page_size', in: /** @type {const} */ ('query'), schema: { type: 'integer' } },
               ],
               responses: { '200': { description: 'OK' } },
             },
@@ -180,8 +182,10 @@ describe('Fix objects', () => {
 
       assert.ok(filterFinding, 'Should have has-filtering finding');
       assertValidFix(filterFinding.fix, 'add-parameter');
-      assert.equal(filterFinding.fix.replacement.name, 'filter');
-      assert.equal(filterFinding.fix.replacement.in, 'query');
+      // @ts-expect-error - we know this is an add-parameter fix with replacement
+      assert.equal(filterFinding.fix?.replacement?.name, 'filter');
+      // @ts-expect-error - we know this is an add-parameter fix with replacement
+      assert.equal(filterFinding.fix?.replacement?.in, 'query');
     });
   });
 
@@ -214,8 +218,8 @@ describe('Fix objects', () => {
 
       assert.ok(paginationFinding, 'Should have list-paginated finding');
       assertValidFix(paginationFinding.fix, 'add-parameters');
-      assert.ok(Array.isArray(paginationFinding.fix.replacement), 'Replacement should be array');
-      assert.equal(paginationFinding.fix.replacement.length, 2);
+      assert.ok(Array.isArray(paginationFinding.fix?.replacement), 'Replacement should be array');
+      assert.equal(paginationFinding.fix?.replacement?.length, 2);
     });
   });
 
@@ -244,7 +248,7 @@ describe('Fix objects', () => {
 
       assert.ok(getBodyFinding, 'Should have get-no-body finding');
       assertValidFix(getBodyFinding.fix, 'remove-request-body');
-      assert.equal(getBodyFinding.fix.specChanges[0].operation, 'remove');
+      assert.equal(getBodyFinding.fix?.specChanges[0].operation, 'remove');
     });
   });
 
@@ -276,8 +280,8 @@ describe('Fix objects', () => {
 
       assert.ok(statusCodeFinding, 'Should have post-returns-201 finding');
       assertValidFix(statusCodeFinding.fix, 'change-status-code');
-      assert.equal(statusCodeFinding.fix.specChanges[0].from, '200');
-      assert.equal(statusCodeFinding.fix.specChanges[0].to, '201');
+      assert.equal(statusCodeFinding.fix?.specChanges[0].from, '200');
+      assert.equal(statusCodeFinding.fix?.specChanges[0].to, '201');
     });
   });
 
@@ -306,7 +310,7 @@ describe('Fix objects', () => {
 
       assert.ok(patchFinding, 'Should have patch-over-put finding');
       assertValidFix(patchFinding.fix, 'add-operation');
-      assert.equal(patchFinding.fix.target.method, 'patch');
+      assert.equal(patchFinding.fix?.target?.method, 'patch');
     });
   });
 
@@ -342,7 +346,7 @@ describe('Fix objects', () => {
 
       assert.ok(schemaFinding, 'Should have schema-defined finding');
       assertValidFix(schemaFinding.fix, 'add-schema');
-      assert.equal(schemaFinding.fix.target.schemaName, 'Error');
+      assert.equal(schemaFinding.fix?.target?.schemaName, 'Error');
     });
   });
 
@@ -370,7 +374,7 @@ describe('Fix objects', () => {
 
       assert.ok(responseFinding, 'Should have responses-documented finding');
       assertValidFix(responseFinding.fix, 'add-response');
-      assert.equal(responseFinding.fix.target.statusCode, 'default');
+      assert.equal(responseFinding.fix?.target?.statusCode, 'default');
     });
   });
 });
@@ -387,7 +391,7 @@ describe('JSONPath validity', () => {
             parameters: [
               {
                 name: 'page_size',
-                in: 'query',
+                in: /** @type {const} */ ('query'),
                 schema: { type: 'integer' },
               },
             ],
@@ -418,6 +422,7 @@ describe('JSONPath validity', () => {
     const result = new OpenAPIReviewer().review(spec);
 
     for (const finding of result.findings) {
+      assert.ok(finding.fix, `Finding ${finding.ruleId} should have fix`);
       assert.ok(
         finding.fix.jsonPath.startsWith('$'),
         `JSONPath should start with $ for ${finding.ruleId}`

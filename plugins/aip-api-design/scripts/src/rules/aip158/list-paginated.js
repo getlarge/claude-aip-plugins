@@ -41,6 +41,7 @@ export class ListPaginatedRule extends OperationRule {
    * @returns {import('../../types.ts').Finding[]}
    */
   checkOperation(method, operation, path, spec, ctx) {
+    /** @type {import('../../types.ts').Finding[]} */
     const findings = [];
 
     // Only check collection endpoints

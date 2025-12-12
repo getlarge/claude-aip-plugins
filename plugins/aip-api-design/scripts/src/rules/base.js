@@ -108,8 +108,8 @@ export class BaseRule {
 export class SpecRule extends BaseRule {
   /**
    * Check the entire OpenAPI spec
-   * @param {OpenAPISpec} spec - The OpenAPI specification
-   * @param {RuleContext} ctx - Rule context with helpers
+   * @param {OpenAPISpec} _spec - The OpenAPI specification
+   * @param {RuleContext} _ctx - Rule context with helpers
    * @returns {Finding[]}
    */
   checkSpec(_spec, _ctx) {
@@ -125,10 +125,10 @@ export class SpecRule extends BaseRule {
 export class PathRule extends BaseRule {
   /**
    * Check a single path
-   * @param {string} path - The path (e.g., "/users/{id}")
-   * @param {PathItem} pathItem - The path item object
-   * @param {OpenAPISpec} spec - Full spec for context
-   * @param {RuleContext} ctx - Rule context with helpers
+   * @param {string} _path - The path (e.g., "/users/{id}")
+   * @param {PathItem} _pathItem - The path item object
+   * @param {OpenAPISpec} _spec - Full spec for context
+   * @param {RuleContext} _ctx - Rule context with helpers
    * @returns {Finding[]}
    */
   checkPath(_path, _pathItem, _spec, _ctx) {
@@ -150,11 +150,11 @@ export class OperationRule extends BaseRule {
 
   /**
    * Check a single operation
-   * @param {string} method - HTTP method (GET, POST, etc.)
-   * @param {Operation} operation - The operation object
-   * @param {string} path - The path this operation belongs to
-   * @param {OpenAPISpec} spec - Full spec for context
-   * @param {RuleContext} ctx - Rule context with helpers
+   * @param {string} _method - HTTP method (GET, POST, etc.)
+   * @param {Operation} _operation - The operation object
+   * @param {string} _path - The path this operation belongs to
+   * @param {OpenAPISpec} _spec - Full spec for context
+   * @param {RuleContext} _ctx - Rule context with helpers
    * @returns {Finding[]}
    */
   checkOperation(_method, _operation, _path, _spec, _ctx) {
@@ -170,10 +170,10 @@ export class OperationRule extends BaseRule {
 export class SchemaRule extends BaseRule {
   /**
    * Check a single schema
-   * @param {string} schemaName - The schema name
-   * @param {Schema} schema - The schema object
-   * @param {OpenAPISpec} spec - Full spec for context
-   * @param {RuleContext} ctx - Rule context with helpers
+   * @param {string} _schemaName - The schema name
+   * @param {Schema} _schema - The schema object
+   * @param {OpenAPISpec} _spec - Full spec for context
+   * @param {RuleContext} _ctx - Rule context with helpers
    * @returns {Finding[]}
    */
   checkSchema(_schemaName, _schema, _spec, _ctx) {
@@ -189,11 +189,11 @@ export class SchemaRule extends BaseRule {
 export class PropertyRule extends BaseRule {
   /**
    * Check a single property
-   * @param {string} propertyName - The property name
-   * @param {Schema} property - The property schema
-   * @param {string} schemaName - Parent schema name
-   * @param {OpenAPISpec} spec - Full spec for context
-   * @param {RuleContext} ctx - Rule context with helpers
+   * @param {string} _propertyName - The property name
+   * @param {Schema} _property - The property schema
+   * @param {string} _schemaName - Parent schema name
+   * @param {OpenAPISpec} _spec - Full spec for context
+   * @param {RuleContext} _ctx - Rule context with helpers
    * @returns {Finding[]}
    */
   checkProperty(_propertyName, _property, _schemaName, _spec, _ctx) {
@@ -215,11 +215,11 @@ export class ParameterRule extends BaseRule {
 
   /**
    * Check a single parameter
-   * @param {Parameter} param - The parameter
-   * @param {string} method - HTTP method
-   * @param {string} path - The path
-   * @param {OpenAPISpec} spec - Full spec for context
-   * @param {RuleContext} ctx - Rule context with helpers
+   * @param {Parameter} _param - The parameter
+   * @param {string} _method - HTTP method
+   * @param {string} _path - The path
+   * @param {OpenAPISpec} _spec - Full spec for context
+   * @param {RuleContext} _ctx - Rule context with helpers
    * @returns {Finding[]}
    */
   checkParameter(_param, _method, _path, _spec, _ctx) {

@@ -33,6 +33,7 @@ export class PatchOverPutRule extends PathRule {
    * @returns {import('../../types.ts').Finding[]}
    */
   checkPath(path, pathItem, spec, ctx) {
+    /** @type {import('../../types.ts').Finding[]} */
     const findings = [];
 
     // Only check resource paths (with ID parameter)
