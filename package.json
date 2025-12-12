@@ -5,10 +5,22 @@
   "type": "module",
   "scripts": {
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "lint": "npm run lint --prefix plugins/aip-api-design/scripts",
+    "typecheck": "npm run typecheck --prefix plugins/aip-api-design/scripts",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "prettier": "^3.4.2",
     "prettier-plugin-sort-json": "^4.0.0"
+  },
+  "lint-staged": {
+    "*.{js,ts,json,md,yaml,yml}": "prettier --write",
+    "plugins/aip-api-design/scripts/src/**/*.js": [
+      "eslint --fix",
+      "prettier --write"
+    ]
   }
 }
