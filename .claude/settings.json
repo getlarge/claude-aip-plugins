@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:linter.aip.dev)",
+      "WebFetch(domain:github.com)",
+      "Bash(gh search:*)",
+      "Bash(gh run view:*)",
+      "Bash(npm run typecheck:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:google.aip.dev)"
+    ]
+  }
+}
