@@ -14,12 +14,12 @@ import {
 import {
   defaultRules,
   defaultRegistry,
-  RuleRegistry,
+  RuleRegistry, // eslint-disable-line no-unused-vars -- may be used later
   BaseRule,
   SpecRule,
   PathRule,
   OperationRule,
-  SchemaRule,
+  SchemaRule, // eslint-disable-line no-unused-vars -- may be used later
   ParameterRule,
 } from './rules/index.js';
 

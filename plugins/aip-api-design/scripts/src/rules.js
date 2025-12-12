@@ -473,10 +473,6 @@ const pluralResourceNames = {
         if (isCustomMethod(segment, path, singletons)) continue;
 
         // Build path up to this segment to check singleton status
-        // Need to account for version prefixes when building path
-        const nonVersionSegments = segments
-          .slice(0, i + 1)
-          .filter((s) => !isVersionPrefix(s));
         const pathToSegment = '/' + segments.slice(0, i + 1).join('/');
 
         // Skip if this is a known singleton resource

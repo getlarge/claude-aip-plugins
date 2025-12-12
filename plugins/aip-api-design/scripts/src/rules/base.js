@@ -112,7 +112,7 @@ export class SpecRule extends BaseRule {
    * @param {RuleContext} ctx - Rule context with helpers
    * @returns {Finding[]}
    */
-  checkSpec(spec, ctx) {
+  checkSpec(_spec, _ctx) {
     throw new Error('checkSpec must be implemented');
   }
 }
@@ -131,7 +131,7 @@ export class PathRule extends BaseRule {
    * @param {RuleContext} ctx - Rule context with helpers
    * @returns {Finding[]}
    */
-  checkPath(path, pathItem, spec, ctx) {
+  checkPath(_path, _pathItem, _spec, _ctx) {
     throw new Error('checkPath must be implemented');
   }
 }
@@ -157,7 +157,7 @@ export class OperationRule extends BaseRule {
    * @param {RuleContext} ctx - Rule context with helpers
    * @returns {Finding[]}
    */
-  checkOperation(method, operation, path, spec, ctx) {
+  checkOperation(_method, _operation, _path, _spec, _ctx) {
     throw new Error('checkOperation must be implemented');
   }
 }
@@ -176,7 +176,7 @@ export class SchemaRule extends BaseRule {
    * @param {RuleContext} ctx - Rule context with helpers
    * @returns {Finding[]}
    */
-  checkSchema(schemaName, schema, spec, ctx) {
+  checkSchema(_schemaName, _schema, _spec, _ctx) {
     throw new Error('checkSchema must be implemented');
   }
 }
@@ -196,7 +196,7 @@ export class PropertyRule extends BaseRule {
    * @param {RuleContext} ctx - Rule context with helpers
    * @returns {Finding[]}
    */
-  checkProperty(propertyName, property, schemaName, spec, ctx) {
+  checkProperty(_propertyName, _property, _schemaName, _spec, _ctx) {
     throw new Error('checkProperty must be implemented');
   }
 }
@@ -222,7 +222,7 @@ export class ParameterRule extends BaseRule {
    * @param {RuleContext} ctx - Rule context with helpers
    * @returns {Finding[]}
    */
-  checkParameter(param, method, path, spec, ctx) {
+  checkParameter(_param, _method, _path, _spec, _ctx) {
     throw new Error('checkParameter must be implemented');
   }
 }

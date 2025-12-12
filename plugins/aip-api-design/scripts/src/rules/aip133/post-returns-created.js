@@ -9,7 +9,7 @@
  */
 
 import { OperationRule } from '../base.js';
-import { responsesToJsonPath, responseToJsonPath } from '../helpers/index.js';
+import { responsesToJsonPath } from '../helpers/index.js';
 
 /**
  * Rule: POST should return 201 Created or 202 Accepted

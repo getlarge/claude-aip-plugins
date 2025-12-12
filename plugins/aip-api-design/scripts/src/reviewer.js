@@ -12,7 +12,7 @@ import {
   defaultRules,
   defaultRegistry,
   getRulesByCategory,
-  BaseRule,
+  BaseRule, // eslint-disable-line no-unused-vars -- used in JSDoc
   SpecRule,
   PathRule,
   OperationRule,
