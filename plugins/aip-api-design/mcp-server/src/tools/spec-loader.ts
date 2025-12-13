@@ -7,6 +7,7 @@
  */
 
 import { readFile, writeFile } from 'node:fs/promises';
+import { DEFAULT_TIMEOUTS } from '../utils/timeout.js';
 
 export interface LoadedSpec {
   spec: Record<string, unknown>;
@@ -64,8 +65,13 @@ export async function loadSpecFromPath(specPath: string): Promise<LoadedSpec> {
 /**
  * Load spec from HTTP(S) URL
  */
-export async function loadSpecFromUrl(specUrl: string): Promise<LoadedSpec> {
-  const response = await fetch(specUrl);
+export async function loadSpecFromUrl(
+  specUrl: string,
+  timeoutMs = DEFAULT_TIMEOUTS.fetch
+): Promise<LoadedSpec> {
+  const response = await fetch(specUrl, {
+    signal: AbortSignal.timeout(timeoutMs),
+  });
   if (!response.ok) {
     throw new Error(`Failed to fetch spec from ${specUrl}: ${response.status}`);
   }
@@ -190,9 +196,12 @@ export async function loadSpecRawFromPath(
  * Parsing will happen in the worker thread.
  */
 export async function loadSpecRawFromUrl(
-  specUrl: string
+  specUrl: string,
+  timeoutMs = DEFAULT_TIMEOUTS.fetch
 ): Promise<LoadedSpecRaw> {
-  const response = await fetch(specUrl);
+  const response = await fetch(specUrl, {
+    signal: AbortSignal.timeout(timeoutMs),
+  });
   if (!response.ok) {
     throw new Error(`Failed to fetch spec from ${specUrl}: ${response.status}`);
   }

@@ -15,6 +15,7 @@ import './worker.js';
 import { availableParallelism } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { DEFAULT_TIMEOUTS } from '../utils/timeout.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -86,10 +87,19 @@ export class WorkerPool {
     });
   }
 
-  private runTask(worker: Worker, queuedTask: QueuedTask): void {
+  private runTask(
+    worker: Worker,
+    queuedTask: QueuedTask,
+    timeoutMs = DEFAULT_TIMEOUTS.worker
+  ): void {
     const { task, resolve, reject } = queuedTask;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
     const cleanup = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = undefined;
+      }
       worker.off('message', onMessage);
       worker.off('error', onError);
       // Return worker to pool
@@ -99,7 +109,7 @@ export class WorkerPool {
       if (next) {
         const nextWorker = this.availableWorkers.pop();
         if (nextWorker) {
-          this.runTask(nextWorker, next);
+          this.runTask(nextWorker, next, timeoutMs);
         }
       }
     };
@@ -114,6 +124,12 @@ export class WorkerPool {
       reject(error);
     };
 
+    const onTimeout = () => {
+      cleanup();
+      reject(new Error(`Worker task timed out after ${timeoutMs}ms`));
+    };
+
+    timeoutId = setTimeout(onTimeout, timeoutMs);
     worker.once('message', onMessage);
     worker.once('error', onError);
     worker.postMessage(task);
