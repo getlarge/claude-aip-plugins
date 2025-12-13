@@ -1,5 +1,17 @@
 # Pagination (AIP-158)
 
+## Linter Rules
+
+The following rules automatically check pagination:
+
+| Rule ID                      | Severity   | What It Checks                                                                   |
+| ---------------------------- | ---------- | -------------------------------------------------------------------------------- |
+| `aip158/list-paginated`      | warning    | Collection endpoints (GET `/resources`) have `page_size` and `page_token` params |
+| `aip158/max-page-size`       | suggestion | `page_size`/`limit` param has `maximum` constraint in schema                     |
+| `aip158/response-next-token` | warning    | 200 response schema includes `next_page_token` field                             |
+
+To skip a rule: `aip-review spec.yaml --skip-rules aip158/max-page-size`
+
 ## Request Parameters
 
 | Parameter    | Type    | Required | Description                                |

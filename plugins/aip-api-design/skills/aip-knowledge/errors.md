@@ -1,5 +1,17 @@
 # Error Handling (AIP-193, AIP-194)
 
+## Linter Rules
+
+The following rules automatically check error handling:
+
+| Rule ID                       | Severity   | What It Checks                                                                |
+| ----------------------------- | ---------- | ----------------------------------------------------------------------------- |
+| `aip193/schema-defined`       | warning    | Error schema exists in `components/schemas`                                   |
+| `aip193/responses-documented` | suggestion | Operations have documented error responses                                    |
+| `aip193/standard-codes`       | suggestion | Uses standard HTTP status codes (400, 401, 403, 404, 409, 422, 429, 500, 503) |
+
+To skip a rule: `aip-review spec.yaml --skip-rules aip193/standard-codes`
+
 ## Standard Error Response Schema
 
 ```json

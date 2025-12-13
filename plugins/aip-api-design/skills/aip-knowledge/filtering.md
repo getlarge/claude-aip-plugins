@@ -1,5 +1,16 @@
 # Filtering & Ordering (AIP-160, AIP-132)
 
+## Linter Rules
+
+The following rules automatically check filtering and ordering:
+
+| Rule ID                | Severity   | What It Checks                                                     |
+| ---------------------- | ---------- | ------------------------------------------------------------------ |
+| `aip132/has-filtering` | suggestion | List endpoints have filter/search params or field-specific filters |
+| `aip132/has-ordering`  | suggestion | List endpoints have `order_by`/`sort` query parameter              |
+
+To skip a rule: `aip-review spec.yaml --skip-rules aip132/has-filtering`
+
 ## Filtering
 
 ### Simple Filters (Field-based)

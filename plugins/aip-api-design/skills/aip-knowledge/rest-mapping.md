@@ -1,5 +1,16 @@
 # REST/OpenAPI Adaptations from Protobuf AIPs
 
+## Linter Rules
+
+**This is a reference document only.** No automated rules - this document helps translate protobuf AIP concepts to REST/OpenAPI equivalents.
+
+Related rules that apply to REST APIs:
+
+- `aip122/*` - Naming conventions
+- `aip131/get-no-body` - GET without body
+- `aip133/post-returns-201` - POST status codes
+- `aip134/patch-over-put` - PATCH for updates
+
 Google's AIPs are written with Protocol Buffers in mind. This guide maps those patterns to REST/OpenAPI conventions.
 
 ## Resource Names

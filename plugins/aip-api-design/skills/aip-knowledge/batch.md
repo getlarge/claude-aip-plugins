@@ -1,5 +1,15 @@
 # Batch Operations (AIP-231, AIP-234, AIP-235)
 
+## Linter Rules
+
+**No automated rules yet.** Batch operation patterns are checked manually. The content below is best-practice guidance from AIP-231+.
+
+Future rules planned:
+
+- Batch size limits validation
+- Batch endpoint naming conventions
+- Partial failure response format
+
 ## When to Batch
 
 Use batch operations when clients need to:

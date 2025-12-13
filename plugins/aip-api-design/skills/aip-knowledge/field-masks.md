@@ -1,5 +1,15 @@
 # Field Masks & Partial Updates (AIP-134)
 
+## Linter Rules
+
+| Rule ID                 | Severity   | What It Checks                                         |
+| ----------------------- | ---------- | ------------------------------------------------------ |
+| `aip134/patch-over-put` | suggestion | Resources with PUT also have PATCH for partial updates |
+
+**Note:** The linter checks for PATCH availability but does not currently validate field mask implementation details. The content below is best-practice guidance.
+
+To skip: `aip-review spec.yaml --skip-rules aip134/patch-over-put`
+
 ## The Problem
 
 How does the server know if a field was:

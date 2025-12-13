@@ -1,5 +1,15 @@
 # Long-Running Operations & Jobs (AIP-151, AIP-155)
 
+## Linter Rules
+
+**No automated rules yet.** Long-running operation patterns are checked manually. The content below is best-practice guidance from AIP-151/155.
+
+Future rules planned:
+
+- Operation resource schema validation
+- Polling endpoint existence
+- 202 Accepted for async operations
+
 ## When to Use
 
 | Pattern         | Use When                                      |
