@@ -9,7 +9,8 @@
   },
   "scripts": {
     "build": "tsc",
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsc --watch --preserveWatchOutput & sleep 2 && node --watch dist/index.js",
+    "dev:stdio": "tsc --watch --preserveWatchOutput & sleep 2 && node --watch dist/stdio.js",
     "start": "node dist/index.js",
     "start:stdio": "node dist/stdio.js",
     "lint": "eslint src/",
@@ -32,11 +33,11 @@
     "@fastify/rate-limit": "^10.0.0",
     "fastify": "^5.0.0",
     "fastify-plugin": "^5.0.0",
+    "yaml": "^2.7.0",
     "zod": "^4.1.13"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "tsx": "^4.0.0",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.32.1"
   },
