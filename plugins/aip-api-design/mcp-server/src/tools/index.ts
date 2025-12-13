@@ -45,6 +45,11 @@ export function registerTools(server: McpServer, context: ToolContext) {
       description: reviewTool.description,
       inputSchema: ReviewInputSchema,
       outputSchema: ReviewResultSchema,
+      annotations: {
+        title: 'AIP OpenAPI Reviewer',
+        readOnlyHint: true,
+        idempotentHint: true,
+      },
     },
     async (args) => reviewTool.execute(args)
   );
@@ -56,6 +61,11 @@ export function registerTools(server: McpServer, context: ToolContext) {
       description: listRulesTool.description,
       inputSchema: ListRulesInputSchema,
       outputSchema: ListRulesOutputSchema,
+      annotations: {
+        title: 'AIP OpenAPI Reviewer - List Rules',
+        readOnlyHint: true,
+        idempotentHint: true,
+      },
     },
     async (args) => listRulesTool.execute(args)
   );
@@ -67,6 +77,11 @@ export function registerTools(server: McpServer, context: ToolContext) {
       description: getInfoTool.description,
       inputSchema: GetInfoInputSchema,
       outputSchema: GetInfoOutputSchema,
+      annotations: {
+        title: 'AIP OpenAPI Reviewer - Get AIP Info',
+        readOnlyHint: true,
+        idempotentHint: true,
+      },
     },
     async (args) => getInfoTool.execute(args)
   );
@@ -78,6 +93,12 @@ export function registerTools(server: McpServer, context: ToolContext) {
       description: applyFixesTool.description,
       inputSchema: ApplyFixesInputSchema,
       outputSchema: ApplyFixesOutputSchema,
+      annotations: {
+        title: 'AIP OpenAPI Reviewer - Apply Fixes',
+        readOnlyHint: false,
+        idempotentHint: true,
+        destructiveHint: false,
+      },
     },
     async (args) => applyFixesTool.execute(args)
   );
