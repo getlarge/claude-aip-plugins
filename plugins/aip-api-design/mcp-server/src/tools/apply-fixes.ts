@@ -2,20 +2,22 @@
  * Apply Fixes Tool
  *
  * Applies suggested fixes to an OpenAPI spec.
- * Supports three input modes for the spec:
- * - specPath: Local file path (STDIO transport only)
- * - specUrl: HTTP(S) URL to fetch spec (works with remote HTTP transport)
- * - spec: Inline JSON object (fallback, inefficient for large specs)
+ * Supports two input modes for the spec:
+ * - specPath: Local file path (STDIO transport)
+ * - specUrl: HTTP(S) URL to fetch spec (HTTP transport)
+ *
+ * Spec data is transferred to worker via SharedArrayBuffer for
+ * zero-copy transfer. Parsing and fixing happens in the worker thread.
  *
  * For token efficiency, modified specs are stored temporarily and a
  * signed URL is returned instead of the full spec content.
  */
 
 import { z } from 'zod';
-import { OpenAPIFixer } from '@getlarge/aip-openapi-reviewer';
-import type { Finding } from '@getlarge/aip-openapi-reviewer/types';
-import { loadSpec, writeSpecToPath } from './spec-loader.js';
+import { loadSpecRaw, writeSpecToPath } from './spec-loader.js';
 import { getTempStorage } from '../services/temp-storage.js';
+import type { ToolContext } from './types.js';
+import type { WorkerTask } from './worker-pool.js';
 
 const SpecChangeSchema = z.object({
   operation: z.enum(['rename-key', 'set', 'add', 'remove', 'merge']),
@@ -56,12 +58,6 @@ export const ApplyFixesInputSchema = z
       .describe(
         'URL to fetch OpenAPI spec from (HTTP/HTTPS). Note: cannot write back to URL.'
       ),
-    spec: z
-      .record(z.string(), z.unknown())
-      .optional()
-      .describe(
-        'OpenAPI specification as inline JSON object. Use specPath or specUrl instead for large specs.'
-      ),
     findings: z
       .array(FindingWithFixSchema)
       .describe(
@@ -79,96 +75,128 @@ export const ApplyFixesInputSchema = z
       .optional()
       .default(false)
       .describe(
-        'Write modified spec back to specPath (only works with specPath, ignored for specUrl/spec)'
+        'Write modified spec back to specPath (only works with specPath, ignored for specUrl)'
       ),
   })
-  .refine((data) => data.specPath || data.specUrl || data.spec, {
-    message: 'One of specPath, specUrl, or spec must be provided',
+  .refine((data) => data.specPath || data.specUrl, {
+    message: 'Either specPath or specUrl must be provided',
   });
 
 export type ApplyFixesInput = z.infer<typeof ApplyFixesInputSchema>;
 
-export const applyFixesTool = {
-  name: 'aip-apply-fixes',
-  description:
-    'Apply suggested fixes to an OpenAPI spec. Provide spec via: specPath (local file), specUrl (HTTP URL), or spec (inline JSON). Use writeBack=true with specPath to save to disk. Returns a signed URL to download the modified spec (valid for 5 minutes).',
-  inputSchema: ApplyFixesInputSchema,
+interface ApplyFixesResult {
+  modifiedSpec: Record<string, unknown>;
+  results: unknown;
+  summary: unknown;
+  errors: unknown;
+  sourcePath: string;
+}
 
-  async execute(input: ApplyFixesInput) {
-    const { specPath, specUrl, spec, findings, dryRun, writeBack } = input;
+/**
+ * Create an apply-fixes tool with the given context (worker pool).
+ */
+export function createApplyFixesTool(context: ToolContext) {
+  return {
+    name: 'aip-apply-fixes',
+    description:
+      'Apply suggested fixes to an OpenAPI spec. Provide spec via: specPath (local file) or specUrl (HTTP URL). Use writeBack=true with specPath to save to disk. Returns a signed URL to download the modified spec (valid for 5 minutes).',
+    inputSchema: ApplyFixesInputSchema,
 
-    const loaded = await loadSpec({ specPath, specUrl, spec });
-    if (!loaded) {
+    async execute(input: ApplyFixesInput) {
+      const { specPath, specUrl, findings, dryRun, writeBack } = input;
+
+      // Load spec as raw buffer (no parsing on main thread)
+      const loaded = await loadSpecRaw({ specPath, specUrl });
+      if (!loaded) {
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({
+                error: 'No spec provided. Use specPath or specUrl.',
+              }),
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Copy to SharedArrayBuffer for zero-copy transfer to worker
+      const sharedBuffer = new SharedArrayBuffer(loaded.buffer.byteLength);
+      new Uint8Array(sharedBuffer).set(new Uint8Array(loaded.buffer));
+
+      const task: WorkerTask = {
+        type: 'apply-fixes',
+        payload: {
+          findings,
+          dryRun,
+        },
+        specBuffer: sharedBuffer,
+        contentType: loaded.contentType,
+        sourcePath: loaded.sourcePath,
+      };
+
+      const result = await context.workerPool.execute(task);
+
+      if (!result.success) {
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({ error: result.error }),
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const data = result.data as ApplyFixesResult;
+      const { modifiedSpec, results, summary, errors, sourcePath } = data;
+
+      // Write back to file if requested and using specPath
+      let writtenTo: string | undefined;
+      if (writeBack && specPath && !dryRun) {
+        await writeSpecToPath(modifiedSpec, specPath);
+        writtenTo = specPath;
+      }
+
+      // Store modified spec and get signed URL (token efficiency)
+      const tempStorage = getTempStorage();
+      const contentType = loaded.contentType;
+
+      const stored = await tempStorage.store(modifiedSpec, {
+        contentType,
+        filename: `fixed-${Date.now()}.${contentType === 'yaml' ? 'yaml' : 'json'}`,
+      });
+
+      // Build response without full spec content
+      const response: Record<string, unknown> = {
+        results,
+        summary,
+        errors,
+        specSource: sourcePath,
+      };
+
+      if (writtenTo) {
+        response.writtenTo = writtenTo;
+      }
+
+      // Include URL or path to download the modified spec
+      if (stored.url) {
+        response.modifiedSpecUrl = stored.url;
+        response.expiresAt = new Date(stored.expiresAt).toISOString();
+      } else if (stored.path) {
+        response.modifiedSpecPath = stored.path;
+      }
+
       return {
         content: [
           {
             type: 'text' as const,
-            text: JSON.stringify({
-              error: 'No spec provided. Use specPath, specUrl, or spec.',
-            }),
+            text: JSON.stringify(response, null, 2),
           },
         ],
-        isError: true,
       };
-    }
-
-    const fixer = new OpenAPIFixer(loaded.spec, { dryRun });
-
-    // Apply each finding that has a fix
-    const results = fixer.applyFixes(findings as unknown as Finding[]);
-    const summary = fixer.getSummary();
-    const modifiedSpec = fixer.getSpec();
-    const errors = fixer.getErrors();
-
-    // Write back to file if requested and using specPath
-    let writtenTo: string | undefined;
-    if (writeBack && specPath && !dryRun) {
-      await writeSpecToPath(modifiedSpec as Record<string, unknown>, specPath);
-      writtenTo = specPath;
-    }
-
-    // Store modified spec and get signed URL (token efficiency)
-    const tempStorage = getTempStorage();
-    const contentType =
-      loaded.sourcePath.endsWith('.yaml') || loaded.sourcePath.endsWith('.yml')
-        ? 'yaml'
-        : 'json';
-
-    const stored = await tempStorage.store(
-      modifiedSpec as Record<string, unknown>,
-      {
-        contentType,
-        filename: `fixed-${Date.now()}.${contentType === 'yaml' ? 'yaml' : 'json'}`,
-      }
-    );
-
-    // Build response without full spec content
-    const response: Record<string, unknown> = {
-      results,
-      summary,
-      errors,
-      specSource: loaded.sourcePath,
-    };
-
-    if (writtenTo) {
-      response.writtenTo = writtenTo;
-    }
-
-    // Include URL or path to download the modified spec
-    if (stored.url) {
-      response.modifiedSpecUrl = stored.url;
-      response.expiresAt = new Date(stored.expiresAt).toISOString();
-    } else if (stored.path) {
-      response.modifiedSpecPath = stored.path;
-    }
-
-    return {
-      content: [
-        {
-          type: 'text' as const,
-          text: JSON.stringify(response, null, 2),
-        },
-      ],
-    };
-  },
-};
+    },
+  };
+}

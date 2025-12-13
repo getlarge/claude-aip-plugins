@@ -2,16 +2,18 @@
  * AIP Review Tool
  *
  * Analyzes an OpenAPI spec against Google AIP guidelines.
- * Supports three input modes:
- * - specPath: Local file path (STDIO transport only)
- * - specUrl: HTTP(S) URL to fetch spec (works with remote HTTP transport)
- * - spec: Inline JSON object (fallback, inefficient for large specs)
+ * Supports two input modes:
+ * - specPath: Local file path (STDIO transport)
+ * - specUrl: HTTP(S) URL to fetch spec (HTTP transport)
+ *
+ * Spec data is transferred to worker via SharedArrayBuffer for
+ * zero-copy transfer. Parsing happens in the worker thread.
  */
 
 import { z } from 'zod';
-import { OpenAPIReviewer, formatJSON } from '@getlarge/aip-openapi-reviewer';
-import type { RuleCategory } from '@getlarge/aip-openapi-reviewer/types';
-import { loadSpec } from './spec-loader.js';
+import { loadSpecRaw } from './spec-loader.js';
+import type { ToolContext } from './types.js';
+import type { WorkerTask } from './worker-pool.js';
 
 // Zod schema for MCP SDK
 export const ReviewInputSchema = z
@@ -27,12 +29,6 @@ export const ReviewInputSchema = z
       .optional()
       .describe(
         'URL to fetch OpenAPI spec from (HTTP/HTTPS). Works with remote HTTP transport.'
-      ),
-    spec: z
-      .record(z.string(), z.unknown())
-      .optional()
-      .describe(
-        'OpenAPI specification as inline JSON object. Use specPath or specUrl instead for large specs.'
       ),
     strict: z
       .boolean()
@@ -50,51 +46,79 @@ export const ReviewInputSchema = z
       .optional()
       .describe('Skip specific rule IDs (e.g., aip122/plural-resources)'),
   })
-  .refine((data) => data.specPath || data.specUrl || data.spec, {
-    message: 'One of specPath, specUrl, or spec must be provided',
+  .refine((data) => data.specPath || data.specUrl, {
+    message: 'Either specPath or specUrl must be provided',
   });
 
 export type ReviewInput = z.infer<typeof ReviewInputSchema>;
 
-export const reviewTool = {
-  name: 'aip-review',
-  description:
-    'Analyze an OpenAPI spec against Google AIP guidelines. Provide spec via: specPath (local file), specUrl (HTTP URL), or spec (inline JSON). Returns findings with severity, rule ID, path, message, and fix suggestions.',
-  inputSchema: ReviewInputSchema,
+/**
+ * Create a review tool with the given context (worker pool).
+ */
+export function createReviewTool(context: ToolContext) {
+  return {
+    name: 'aip-review',
+    description:
+      'Analyze an OpenAPI spec against Google AIP guidelines. Provide spec via: specPath (local file) or specUrl (HTTP URL). Returns findings with severity, rule ID, path, message, and fix suggestions.',
+    inputSchema: ReviewInputSchema,
 
-  async execute(input: ReviewInput) {
-    const { specPath, specUrl, spec, strict, categories, skipRules } = input;
+    async execute(input: ReviewInput) {
+      const { specPath, specUrl, strict, categories, skipRules } = input;
 
-    const loaded = await loadSpec({ specPath, specUrl, spec });
-    if (!loaded) {
+      // Load spec as raw buffer (no parsing on main thread)
+      const loaded = await loadSpecRaw({ specPath, specUrl });
+      if (!loaded) {
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({
+                error: 'No spec provided. Use specPath or specUrl.',
+              }),
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Copy to SharedArrayBuffer for zero-copy transfer to worker
+      const sharedBuffer = new SharedArrayBuffer(loaded.buffer.byteLength);
+      new Uint8Array(sharedBuffer).set(new Uint8Array(loaded.buffer));
+
+      const task: WorkerTask = {
+        type: 'review',
+        payload: {
+          strict,
+          categories,
+          skipRules,
+        },
+        specBuffer: sharedBuffer,
+        contentType: loaded.contentType,
+        sourcePath: loaded.sourcePath,
+      };
+
+      const result = await context.workerPool.execute(task);
+
+      if (!result.success) {
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({ error: result.error }),
+            },
+          ],
+          isError: true,
+        };
+      }
+
       return {
         content: [
           {
             type: 'text' as const,
-            text: JSON.stringify({
-              error: 'No spec provided. Use specPath, specUrl, or spec.',
-            }),
+            text: result.data as string,
           },
         ],
-        isError: true,
       };
-    }
-
-    const reviewer = new OpenAPIReviewer({
-      strict,
-      categories: categories as RuleCategory[] | undefined,
-      skipRules,
-    });
-
-    const result = reviewer.review(loaded.spec, loaded.sourcePath);
-
-    return {
-      content: [
-        {
-          type: 'text' as const,
-          text: formatJSON(result),
-        },
-      ],
-    };
-  },
-};
+    },
+  };
+}

@@ -12,6 +12,8 @@ import {
   initTempStorage,
   shutdownTempStorage,
 } from './services/temp-storage.js';
+import { WorkerPool } from './tools/worker-pool.js';
+import type { ToolContext } from './tools/types.js';
 
 async function main() {
   // Initialize temp storage (memory store with FS for STDIO)
@@ -21,21 +23,29 @@ async function main() {
     ttlMs: 5 * 60 * 1000, // 5 minutes
   });
 
-  const mcpServer = createMcpServer();
+  // Initialize worker pool for CPU-intensive operations
+  const workerPool = new WorkerPool();
+  await workerPool.initialize();
+  console.error(
+    `Worker pool initialized with ${workerPool.stats.total} workers`
+  );
+
+  const toolContext: ToolContext = { workerPool };
+  const mcpServer = createMcpServer(toolContext);
   const transport = new StdioServerTransport();
 
   // Log to stderr to avoid interfering with MCP protocol on stdout
   console.error(`${SERVER_NAME} v${SERVER_VERSION} starting in STDIO mode...`);
 
   // Cleanup on exit
-  process.on('SIGINT', async () => {
+  const cleanup = async () => {
+    await workerPool.shutdown();
     await shutdownTempStorage();
     process.exit(0);
-  });
-  process.on('SIGTERM', async () => {
-    await shutdownTempStorage();
-    process.exit(0);
-  });
+  };
+
+  process.on('SIGINT', cleanup);
+  process.on('SIGTERM', cleanup);
 
   await mcpServer.connect(transport);
 

@@ -23,6 +23,8 @@ import {
   shutdownTempStorage,
   getTempStorage,
 } from './services/temp-storage.js';
+import { WorkerPool } from './tools/worker-pool.js';
+import type { ToolContext } from './tools/types.js';
 
 // ============================================================================
 // Session Storage (adapted from fastify-mcp)
@@ -167,6 +169,16 @@ export async function createServer(config: ServerConfig = {}) {
     ttlMs: 5 * 60 * 1000, // 5 minutes
   });
 
+  // Initialize worker pool for CPU-intensive operations
+  const workerPool = new WorkerPool();
+  await workerPool.initialize();
+  fastify.log.info(
+    { poolSize: workerPool.stats.total },
+    'Worker pool initialized'
+  );
+
+  const toolContext: ToolContext = { workerPool };
+
   // Log session events
   sessions.on('connected', (id) => {
     fastify.log.info({ sessionId: id }, 'MCP session connected');
@@ -183,6 +195,7 @@ export async function createServer(config: ServerConfig = {}) {
       version: SERVER_VERSION,
       sessions: sessions.count,
       tempStorage: tempStorage.stats,
+      workerPool: workerPool.stats,
     };
   });
 
@@ -247,7 +260,7 @@ export async function createServer(config: ServerConfig = {}) {
         }
 
         const transport = createStatefulTransport(sessions);
-        const server = createMcpServer();
+        const server = createMcpServer(toolContext);
         await server.connect(transport);
         await transport.handleRequest(req.raw, reply.raw, req.body);
       } else {
@@ -289,7 +302,7 @@ export async function createServer(config: ServerConfig = {}) {
   } else {
     // Stateless MCP routes (new server per request)
     fastify.post(mcpEndpoint, async (req, reply) => {
-      const server = await createMcpServer();
+      const server = createMcpServer(toolContext);
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: undefined,
       });
@@ -322,6 +335,7 @@ export async function createServer(config: ServerConfig = {}) {
       fastify.log.info(`Mode: ${stateful ? 'stateful' : 'stateless'}`);
     },
     async stop() {
+      await workerPool.shutdown();
       await shutdownTempStorage();
       await fastify.close();
     },
