@@ -506,4 +506,6 @@ async function handleFixMode(spec, specPath, result, options) {
 
 // Run CLI
 const exitCode = await main(process.argv.slice(2));
-process.exit(exitCode);
+
+// Use exitCode instead of exit() to allow stdout to flush properly
+process.exitCode = exitCode;
