@@ -95,20 +95,34 @@ export const ApplyFixesInputSchema = z
 
 export type ApplyFixesInput = z.infer<typeof ApplyFixesInputSchema>;
 
+// Schema for change log entry (matches library ChangeLogEntry)
+const ChangeLogEntrySchema = z.object({
+  change: z.object({
+    operation: z.enum(['rename-key', 'set', 'add', 'remove', 'merge']),
+    path: z.string(),
+    from: z.string().optional(),
+    to: z.string().optional(),
+    value: z.unknown().optional(),
+  }),
+  applied: z.boolean(),
+  error: z.string().optional(),
+});
+
+// Schema for fix result (matches library FixResult)
+const FixResultSchema = z.object({
+  ruleId: z.string(),
+  applied: z.boolean(),
+  changes: z.array(ChangeLogEntrySchema),
+});
+
 // Schema for structured apply-fixes output
 export const ApplyFixesOutputSchema = z.object({
-  results: z.array(
-    z.object({
-      ruleId: z.string(),
-      path: z.string(),
-      success: z.boolean(),
-      error: z.string().optional(),
-    })
-  ),
+  results: z.array(FixResultSchema),
   summary: z.object({
-    attempted: z.number(),
-    succeeded: z.number(),
+    total: z.number(),
+    applied: z.number(),
     failed: z.number(),
+    changes: z.number(),
   }),
   errors: z.array(z.string()),
   specSource: z.string(),
@@ -122,9 +136,9 @@ export type ApplyFixesOutput = z.infer<typeof ApplyFixesOutputSchema>;
 
 interface ApplyFixesResult {
   modifiedSpec: Record<string, unknown>;
-  results: unknown;
-  summary: unknown;
-  errors: unknown;
+  results: ApplyFixesOutput['results'];
+  summary: ApplyFixesOutput['summary'];
+  errors: string[];
   sourcePath: string;
 }
 
