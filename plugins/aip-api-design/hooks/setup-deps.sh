@@ -22,8 +22,9 @@ setup_package() {
         return 0
     fi
 
-    # Install dependencies if node_modules missing
-    if [ ! -d "$dir/node_modules" ]; then
+    # Install dependencies if .package-lock.json missing (npm creates this after install)
+    # We check this instead of node_modules because symlinks may create node_modules early
+    if [ ! -f "$dir/node_modules/.package-lock.json" ]; then
         echo "[aip-api-design] Installing $name dependencies..."
         cd "$dir"
         npm install --silent --no-progress --no-audit --no-fund 2>/dev/null || {
@@ -45,10 +46,43 @@ setup_package() {
     return 0
 }
 
-# Setup scripts package first (mcp-server depends on it for types)
+# Function to link local package as dependency
+# Creates symlink in node_modules to satisfy peer dependency without npm registry
+link_local_dependency() {
+    local target_dir="$1"      # Package that needs the dependency
+    local source_dir="$2"      # Local package to link
+    local package_name="$3"    # Scoped package name (e.g., @getlarge/aip-openapi-reviewer)
+
+    if [ ! -d "$target_dir" ] || [ ! -d "$source_dir" ]; then
+        return 0
+    fi
+
+    local scope_dir="$target_dir/node_modules/$(dirname "$package_name")"
+    local link_path="$target_dir/node_modules/$package_name"
+
+    # Skip if already exists
+    if [ -e "$link_path" ] || [ -L "$link_path" ]; then
+        return 0
+    fi
+
+    echo "[aip-api-design] Linking local dependency: $package_name"
+    mkdir -p "$scope_dir"
+
+    # Relative path from mcp-server/node_modules/@getlarge/ to openapi-reviewer
+    ln -s "../../../openapi-reviewer" "$link_path" 2>/dev/null || {
+        echo "[aip-api-design] Warning: Failed to create symlink for $package_name"
+        return 1
+    }
+}
+
+# Setup openapi-reviewer first (mcp-server depends on it)
 setup_package "$OPENAPI_REVIEWER_DIR" "reviewer"
 
-# Setup MCP server
+# Link openapi-reviewer into mcp-server's node_modules BEFORE npm install
+# This satisfies the peer dependency without needing the package on npm registry
+link_local_dependency "$MCP_SERVER_DIR" "$OPENAPI_REVIEWER_DIR" "@getlarge/aip-openapi-reviewer"
+
+# Setup MCP server (npm install will see peer dep already satisfied via symlink)
 setup_package "$MCP_SERVER_DIR" "MCP server"
 
 echo "[aip-api-design] Setup complete."
