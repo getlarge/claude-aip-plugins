@@ -30,6 +30,7 @@
     "test": "node --test src/**/*.test.js",
     "test:integration": "node --test tests/integration.test.js",
     "test:plugin": "node --test tests/plugin.test.js",
+    "test:e2e": "node --test tests/e2e.test.js",
     "test:all": "node --test src/**/*.test.js tests/**/*.test.js",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
