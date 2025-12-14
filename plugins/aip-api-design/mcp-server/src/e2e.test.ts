@@ -2,7 +2,7 @@
  * End-to-End Tests for MCP Server
  *
  * Tests the MCP server tools via STDIO transport.
- * Run with: npm test or node --test src/e2e.test.ts
+ * Run with: npm run test:e2e
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -344,7 +344,55 @@ describe('MCP Server E2E Tests', () => {
 
       // Check structured output
       assert.ok(fixContent?.results, 'Should have results array');
+      assert.ok(Array.isArray(fixContent.results), 'results should be array');
       assert.ok(fixContent?.summary, 'Should have summary');
+
+      // Verify summary structure matches library output
+      const summary = fixContent.summary as Record<string, number>;
+      assert.strictEqual(
+        typeof summary.total,
+        'number',
+        'summary.total should be number'
+      );
+      assert.strictEqual(
+        typeof summary.applied,
+        'number',
+        'summary.applied should be number'
+      );
+      assert.strictEqual(
+        typeof summary.failed,
+        'number',
+        'summary.failed should be number'
+      );
+      assert.strictEqual(
+        typeof summary.changes,
+        'number',
+        'summary.changes should be number'
+      );
+
+      // If there are results, verify structure matches library FixResult
+      if ((fixContent.results as unknown[]).length > 0) {
+        const firstResult = (
+          fixContent.results as Array<Record<string, unknown>>
+        )[0];
+        assert.ok(firstResult.ruleId, 'FixResult should have ruleId');
+        assert.strictEqual(
+          typeof firstResult.applied,
+          'boolean',
+          'FixResult.applied should be boolean'
+        );
+        assert.ok(
+          Array.isArray(firstResult.changes),
+          'FixResult.changes should be array'
+        );
+      }
+
+      // Verify resource link to modified spec
+      const resourceLink = fixResponse.result?.content?.find(
+        (c) => c.type === 'resource_link'
+      );
+      assert.ok(resourceLink, 'Should have resource_link to modified spec');
+      assert.ok(resourceLink.uri, 'resource_link should have uri');
     });
 
     test('reports error for invalid reviewId', async () => {
