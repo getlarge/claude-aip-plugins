@@ -13,6 +13,7 @@
 import { z } from 'zod';
 import { loadSpecRaw } from './spec-loader.js';
 import { storeFindings } from '../services/findings-storage.js';
+import { BaseFindingSchema } from '../types/extended-finding.js';
 import type { ToolContext } from './types.js';
 import type { WorkerTask } from './worker-pool.js';
 
@@ -58,39 +59,7 @@ export const ReviewResultSchema = z.object({
   reviewId: z
     .string()
     .describe('Hash of spec content, use to retrieve cached findings'),
-  findings: z.array(
-    z.object({
-      ruleId: z.string(),
-      severity: z.enum(['error', 'warning', 'suggestion']),
-      category: z.string(),
-      path: z.string(),
-      message: z.string(),
-      aip: z.string().optional(),
-      suggestion: z.string().optional(),
-      context: z.record(z.string(), z.unknown()).optional(),
-      fix: z
-        .object({
-          type: z.string(),
-          jsonPath: z.string(),
-          specChanges: z.array(
-            z.object({
-              operation: z.enum([
-                'rename-key',
-                'set',
-                'add',
-                'remove',
-                'merge',
-              ]),
-              path: z.string(),
-              from: z.string().optional(),
-              to: z.string().optional(),
-              value: z.unknown().optional(),
-            })
-          ),
-        })
-        .optional(),
-    })
-  ),
+  findings: z.array(BaseFindingSchema),
   summary: z.object({
     total: z.number(),
     errors: z.number(),
@@ -226,8 +195,17 @@ export function createReviewTool(context: ToolContext) {
           specSource: reviewedSpecPath,
         });
       } catch {
-        // Caching failure is non-fatal, use fallback
-        stored = { id: reviewId, expiresAt: Date.now() + 24 * 60 * 60 * 1000 };
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({
+                error: 'Failed to store findings for reviewId caching',
+              }),
+            },
+          ],
+          isError: true,
+        };
       }
 
       // Build compact output (token-efficient response)
@@ -259,26 +237,31 @@ export function createReviewTool(context: ToolContext) {
         resourceUri = stored.url;
       } else if (stored.path) {
         resourceUri = `file://${stored.path}`;
-      }
-
-      if (resourceUri) {
+      } else {
         return {
           content: [
-            textContent,
             {
-              type: 'resource_link' as const,
-              uri: resourceUri,
-              name: `findings-${reviewId}.json`,
-              description: 'Full AIP review findings',
-              mimeType: 'application/json',
+              type: 'text' as const,
+              text: JSON.stringify({
+                error: 'Findings storage unavailable',
+              }),
             },
           ],
-          structuredContent: compactOutput,
+          isError: true,
         };
       }
 
       return {
-        content: [textContent],
+        content: [
+          textContent,
+          {
+            type: 'resource_link' as const,
+            uri: resourceUri,
+            name: `findings-${reviewId}.json`,
+            description: 'Full AIP review findings',
+            mimeType: 'application/json',
+          },
+        ],
         structuredContent: compactOutput,
       };
     },

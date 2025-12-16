@@ -17,33 +17,9 @@ import { z } from 'zod';
 import { loadSpecRaw, writeSpecToPath } from './spec-loader.js';
 import { getTempStorage } from '../services/temp-storage.js';
 import { getFindings } from '../services/findings-storage.js';
+import { type BaseFinding } from '../types/extended-finding.js';
 import type { ToolContext } from './types.js';
 import type { WorkerTask } from './worker-pool.js';
-
-const SpecChangeSchema = z.object({
-  operation: z.enum(['rename-key', 'set', 'add', 'remove', 'merge']),
-  path: z.string(),
-  from: z.string().optional(),
-  to: z.string().optional(),
-  value: z.unknown().optional(),
-});
-
-const FixSchema = z.object({
-  type: z.string(),
-  jsonPath: z.string(),
-  specChanges: z.array(SpecChangeSchema),
-});
-
-const FindingWithFixSchema = z.object({
-  ruleId: z.string(),
-  severity: z.enum(['error', 'warning', 'suggestion']),
-  category: z.string(),
-  path: z.string(),
-  message: z.string(),
-  aip: z.string().optional(),
-  suggestion: z.string().optional(),
-  fix: FixSchema.optional(),
-});
 
 export const ApplyFixesInputSchema = z
   .object({
@@ -61,15 +37,8 @@ export const ApplyFixesInputSchema = z
       ),
     reviewId: z
       .string()
-      .optional()
       .describe(
-        'Review ID from aip-review to retrieve cached findings. If provided, findings parameter is ignored.'
-      ),
-    findings: z
-      .array(FindingWithFixSchema)
-      .optional()
-      .describe(
-        'Array of finding objects from aip-review (only those with fix property will be applied). Ignored if reviewId is provided.'
+        'Review ID from aip-review to retrieve cached findings for applying fixes.'
       ),
     dryRun: z
       .boolean()
@@ -88,9 +57,6 @@ export const ApplyFixesInputSchema = z
   })
   .refine((data) => data.specPath || data.specUrl, {
     message: 'Either specPath or specUrl must be provided',
-  })
-  .refine((data) => data.reviewId || data.findings, {
-    message: 'Either reviewId or findings must be provided',
   });
 
 export type ApplyFixesInput = z.infer<typeof ApplyFixesInputSchema>;
@@ -154,27 +120,25 @@ export function createApplyFixesTool(context: ToolContext) {
 
     async execute(input: ApplyFixesInput) {
       const { specPath, specUrl, reviewId, dryRun, writeBack } = input;
-      let { findings } = input;
 
-      // If reviewId provided, retrieve cached findings
-      if (reviewId) {
-        const cached = await getFindings(reviewId);
-        if (!cached) {
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: JSON.stringify({
-                  error: `No cached findings found for reviewId: ${reviewId}. Run aip-review first or provide findings directly.`,
-                }),
-              },
-            ],
-            isError: true,
-          };
-        }
-        // Use cached findings (they include the fix property)
-        findings = (cached as { findings: typeof findings }).findings;
+      // Retrieve cached findings using reviewId
+      const cached = await getFindings(reviewId);
+      if (!cached) {
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({
+                error: `No cached findings found for reviewId: ${reviewId}. Run aip-review first.`,
+              }),
+            },
+          ],
+          isError: true,
+        };
       }
+
+      // Use cached findings (they include the fix property)
+      const findings = (cached as { findings: BaseFinding[] }).findings;
 
       if (!findings || findings.length === 0) {
         return {
@@ -182,8 +146,7 @@ export function createApplyFixesTool(context: ToolContext) {
             {
               type: 'text' as const,
               text: JSON.stringify({
-                error:
-                  'No findings to apply. Provide findings or a valid reviewId.',
+                error: 'No findings to apply.',
               }),
             },
           ],

@@ -33,6 +33,7 @@ export const BaseFindingSchema = z.object({
   message: z.string(),
   aip: z.string().optional(),
   suggestion: z.string().optional(),
+  context: z.record(z.string(), z.unknown()).optional(), // Additional context from the rule
   fix: z
     .object({
       type: z.string(),
@@ -40,6 +41,7 @@ export const BaseFindingSchema = z.object({
       specChanges: z.array(SpecChangeSchema),
     })
     .optional(),
+  codeLocations: z.array(z.lazy(() => CodeLocationSchema)).optional(), // Allow findings to have code locations after correlation
 });
 
 export type BaseFinding = z.infer<typeof BaseFindingSchema>;

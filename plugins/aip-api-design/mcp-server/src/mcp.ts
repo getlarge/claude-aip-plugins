@@ -7,7 +7,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerTools } from './tools/index.js';
-import type { ToolContext } from './tools/types.js';
+import type { ToolContext, ExtendedToolContext } from './tools/types.js';
 
 export const SERVER_NAME = 'aip-openapi-reviewer';
 export const SERVER_VERSION = '1.0.0';
@@ -23,7 +23,13 @@ export function createMcpServer(context: ToolContext) {
     version: SERVER_VERSION,
   });
 
-  registerTools(mcpServer, context);
+  // Build extended context with server reference for tools that need it
+  const extendedContext: ExtendedToolContext = {
+    ...context,
+    server: mcpServer.server,
+  };
+
+  registerTools(mcpServer, extendedContext);
 
   return mcpServer;
 }
