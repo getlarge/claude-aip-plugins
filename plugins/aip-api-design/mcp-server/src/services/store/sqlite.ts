@@ -142,8 +142,7 @@ export class SqliteStore extends BaseStore {
       timestamp: now,
     });
 
-    const url = this.generateSignedUrl(id, expiresAt);
-    return { id, url, expiresAt };
+    return { id, path: options.filename, expiresAt };
   }
 
   async get(id: string): Promise<StoredSpec | null> {

@@ -116,8 +116,7 @@ export class MemoryStore extends BaseStore {
         timestamp: now,
       });
 
-      const url = this.generateSignedUrl(id, expiresAt);
-      return { id, url, expiresAt };
+      return { id, expiresAt };
     }
   }
 

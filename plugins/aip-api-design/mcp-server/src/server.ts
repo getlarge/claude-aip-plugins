@@ -39,14 +39,12 @@ export interface ServerConfig {
   port?: number;
   host?: string;
   mcpEndpoint?: string;
-  baseUrl?: string;
 }
 
 const DEFAULT_CONFIG: Required<ServerConfig> = {
   port: 4000,
   host: '0.0.0.0',
   mcpEndpoint: '/mcp',
-  baseUrl: 'http://localhost:4000',
 };
 
 // ============================================================================
@@ -54,7 +52,7 @@ const DEFAULT_CONFIG: Required<ServerConfig> = {
 // ============================================================================
 
 export async function createServer(config: ServerConfig = {}) {
-  const { port, host, mcpEndpoint, baseUrl } = {
+  const { port, host, mcpEndpoint } = {
     ...DEFAULT_CONFIG,
     ...config,
   };
@@ -75,7 +73,6 @@ export async function createServer(config: ServerConfig = {}) {
   // Initialize temp storage for storing modified specs
   await initTempStorage({
     type: 'sqlite',
-    baseUrl,
     ttlMs: 5 * 60 * 1000, // 5 minutes
   });
 
@@ -83,7 +80,6 @@ export async function createServer(config: ServerConfig = {}) {
   // Uses longer TTL (1 day) since findings are useful across sessions
   await initFindingsStorage({
     type: 'sqlite',
-    baseUrl,
     ttlMs: 24 * 60 * 60 * 1000,
   });
 
@@ -114,7 +110,6 @@ export async function createServer(config: ServerConfig = {}) {
     };
   });
 
-  // MCP routes (stateful session management)
   fastify.post(mcpEndpoint, async (req, reply) => {
     const sessionId = req.headers['mcp-session-id'];
     if (Array.isArray(sessionId)) {

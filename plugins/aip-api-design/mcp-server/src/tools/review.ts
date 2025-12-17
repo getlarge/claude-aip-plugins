@@ -220,8 +220,6 @@ export function createReviewTool(context: ExtendedToolContext) {
           warnings: summary.warnings,
           suggestions: summary.suggestions,
         },
-        ...(stored.url && { findingsUrl: stored.url }),
-        ...(stored.path && { findingsPath: stored.path }),
         expiresAt: new Date(stored.expiresAt).toISOString(),
       };
 
@@ -231,25 +229,7 @@ export function createReviewTool(context: ExtendedToolContext) {
         text: JSON.stringify(compactOutput, null, 2),
       };
 
-      // Determine resource link URI
-      let resourceUri: string | undefined;
-      if (stored.url) {
-        resourceUri = stored.url;
-      } else if (stored.path) {
-        resourceUri = `file://${stored.path}`;
-      } else {
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify({
-                error: 'Findings storage unavailable',
-              }),
-            },
-          ],
-          isError: true,
-        };
-      }
+      const resourceUri = `aip://findings/${reviewId}`;
 
       return {
         content: [

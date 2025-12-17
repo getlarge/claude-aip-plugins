@@ -118,6 +118,7 @@ export function createApplyFixesTool(context: ToolContext) {
       'Apply suggested fixes to an OpenAPI spec. Provide spec via: specPath (local file) or specUrl (HTTP URL). Use writeBack=true with specPath to save to disk. Returns a signed URL to download the modified spec (valid for 5 minutes).',
     inputSchema: ApplyFixesInputSchema,
 
+    // TODO: use request context to authorize access to reviewId findings
     async execute(input: ApplyFixesInput) {
       const { specPath, specUrl, reviewId, dryRun, writeBack } = input;
 
@@ -226,11 +227,7 @@ export function createApplyFixesTool(context: ToolContext) {
         errors: errors as ApplyFixesOutput['errors'],
         specSource: sourcePath,
         ...(writtenTo && { writtenTo }),
-        ...(stored.url && {
-          modifiedSpecUrl: stored.url,
-          expiresAt: new Date(stored.expiresAt).toISOString(),
-        }),
-        ...(stored.path && { modifiedSpecPath: stored.path }),
+        expiresAt: new Date(stored.expiresAt).toISOString(),
       };
 
       // Build content array with text and optional resource link
@@ -238,38 +235,22 @@ export function createApplyFixesTool(context: ToolContext) {
         contentType === 'yaml' ? 'application/x-yaml' : 'application/json';
       const filename = `fixed-spec.${contentType === 'yaml' ? 'yaml' : 'json'}`;
 
-      // Determine resource link URI
-      let resourceUri: string | undefined;
-      if (stored.url) {
-        resourceUri = stored.url;
-      } else if (stored.path) {
-        resourceUri = `file://${stored.path}`;
-      }
-
-      // Build content with proper MCP types
-      const textContent = {
-        type: 'text' as const,
-        text: JSON.stringify(output, null, 2),
-      };
-
-      if (resourceUri) {
-        return {
-          content: [
-            textContent,
-            {
-              type: 'resource_link' as const,
-              uri: resourceUri,
-              name: filename,
-              description: 'Modified OpenAPI spec with fixes applied',
-              mimeType,
-            },
-          ],
-          structuredContent: output,
-        };
-      }
+      const resourceUri = `aip://specs/${stored.id}`;
 
       return {
-        content: [textContent],
+        content: [
+          {
+            type: 'text' as const,
+            text: JSON.stringify(output, null, 2),
+          },
+          {
+            type: 'resource_link' as const,
+            uri: resourceUri,
+            name: filename,
+            description: 'Modified OpenAPI spec with fixes applied',
+            mimeType,
+          },
+        ],
         structuredContent: output,
       };
     },

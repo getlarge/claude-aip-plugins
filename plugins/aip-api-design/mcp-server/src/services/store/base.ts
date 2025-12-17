@@ -11,7 +11,7 @@
  */
 
 import { EventEmitter } from 'node:events';
-import { randomBytes, createHmac } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 
 export interface StoredSpec {
   id: string;
@@ -25,15 +25,10 @@ export interface StoredSpec {
 export interface StoreOptions {
   /** Time-to-live in milliseconds (default: 5 minutes) */
   ttlMs?: number;
-  /** Secret for signing URLs */
-  secret?: string;
-  /** Base URL for generating download URLs (HTTP transport) */
-  baseUrl?: string;
 }
 
 export interface StoreResult {
   id: string;
-  url?: string;
   path?: string;
   expiresAt: number;
 }
@@ -92,15 +87,11 @@ const DEFAULT_TTL_MS = 5 * 60 * 1000; // 5 minutes
  * Extends EventEmitter to notify listeners of resource changes.
  */
 export abstract class BaseStore extends EventEmitter {
-  protected secret: string;
   protected ttlMs: number;
-  protected baseUrl?: string;
 
   constructor(options: StoreOptions = {}) {
     super();
-    this.secret = options.secret ?? randomBytes(32).toString('hex');
     this.ttlMs = options.ttlMs ?? DEFAULT_TTL_MS;
-    this.baseUrl = options.baseUrl;
   }
 
   /**
@@ -154,51 +145,6 @@ export abstract class BaseStore extends EventEmitter {
    * Get storage statistics.
    */
   abstract get stats(): StoreStats;
-
-  /**
-   * Validate a signed URL and return the spec if valid.
-   */
-  async getBySignedUrl(
-    id: string,
-    signature: string,
-    expires: string
-  ): Promise<StoredSpec | null> {
-    const expiresAt = parseInt(expires, 10);
-    if (isNaN(expiresAt) || Date.now() > expiresAt) {
-      return null;
-    }
-
-    const expectedSig = this.sign(id, expiresAt);
-    if (signature !== expectedSig) {
-      return null;
-    }
-
-    return this.get(id);
-  }
-
-  /**
-   * Generate a signed URL for accessing a stored spec.
-   */
-  protected generateSignedUrl(
-    id: string,
-    expiresAt: number
-  ): string | undefined {
-    if (!this.baseUrl) return undefined;
-
-    const signature = this.sign(id, expiresAt);
-    return `${this.baseUrl}/specs/${id}?expires=${expiresAt}&sig=${signature}`;
-  }
-
-  /**
-   * Sign an ID with expiry timestamp.
-   */
-  protected sign(id: string, expiresAt: number): string {
-    const data = `${id}:${expiresAt}`;
-    return createHmac('sha256', this.secret)
-      .update(data)
-      .digest('hex')
-      .slice(0, 32);
-  }
 
   /**
    * Generate a random ID.
