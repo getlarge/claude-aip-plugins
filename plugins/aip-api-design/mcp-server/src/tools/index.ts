@@ -25,15 +25,15 @@ import {
   ApplyFixesInputSchema,
   ApplyFixesOutputSchema,
 } from './apply-fixes.js';
-import type { ToolContext } from './types.js';
+import type { ExtendedToolContext } from './types.js';
 
 /**
  * Register all AIP tools with the MCP server.
  *
  * @param server - MCP server instance
- * @param context - Tool context containing shared dependencies (worker pool)
+ * @param context - Tool context containing shared dependencies (worker pool, server)
  */
-export function registerTools(server: McpServer, context: ToolContext) {
+export function registerTools(server: McpServer, context: ExtendedToolContext) {
   // Create tools with context (worker pool)
   const reviewTool = createReviewTool(context);
   const applyFixesTool = createApplyFixesTool(context);
