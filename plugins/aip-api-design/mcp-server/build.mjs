@@ -40,8 +40,7 @@ const commonOptions = {
   platform: 'node',
   target: 'node22',
   format: 'esm',
-  // Keep MCP SDK external (provided by Claude Code runtime)
-  external: ['@modelcontextprotocol/sdk'],
+  // Bundle everything - MCP SDK is NOT provided by Claude Code in plugin context
   minify: false,
   sourcemap: true,
   logLevel: 'info',
