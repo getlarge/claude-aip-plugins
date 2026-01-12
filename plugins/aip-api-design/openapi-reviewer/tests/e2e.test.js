@@ -296,3 +296,50 @@ describe('CLI Error Handling', () => {
     assert.ok(stdout.includes('USAGE'), 'Should show usage');
   });
 });
+
+describe('CLI Invalid Spec Handling', () => {
+  const INVALID_SPEC_PATH = join(
+    __dirname,
+    '..',
+    'src',
+    '__fixtures__',
+    'invalid-spec.yaml'
+  );
+
+  it('exits with code 2 for invalid OpenAPI spec', async () => {
+    const { exitCode, stderr } = await runCLI([INVALID_SPEC_PATH]);
+
+    assert.strictEqual(exitCode, 2, 'Should exit with code 2 for invalid spec');
+    assert.ok(
+      stderr.includes('Error') || stderr.includes('error'),
+      'Should show error message in stderr'
+    );
+  });
+
+  it('shows validation error message for invalid spec', async () => {
+    const { stderr } = await runCLI([INVALID_SPEC_PATH]);
+
+    // SwaggerParser validation error should mention the issue
+    assert.ok(
+      stderr.toLowerCase().includes('error') ||
+        stderr.toLowerCase().includes('invalid') ||
+        stderr.toLowerCase().includes('missing'),
+      'Should explain validation error'
+    );
+  });
+
+  it('handles malformed JSON spec', async () => {
+    const MALFORMED_JSON = join(__dirname, 'fixtures', 'malformed.json');
+    const { exitCode, stderr } = await runCLI([MALFORMED_JSON]);
+
+    assert.strictEqual(
+      exitCode,
+      2,
+      'Should exit with code 2 for malformed JSON'
+    );
+    assert.ok(
+      stderr.includes('Error') || stderr.includes('error'),
+      'Should show error message'
+    );
+  });
+});

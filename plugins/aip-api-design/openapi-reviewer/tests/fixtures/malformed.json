@@ -1,0 +1,10 @@
+{
+  "info": {
+    "title": "Malformed Spec",
+    "version": "1.0.0"
+  },
+  "openapi": "3.0.0",
+  "paths": {
+    // This comment makes it invalid JSON
+  }
+}
