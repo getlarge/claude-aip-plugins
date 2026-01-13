@@ -77231,69 +77231,38 @@ function validatePropertySchema(name, schema) {
   return errors;
 }
 
-// ../../../node_modules/@platformatic/mcp/dist/decorators/meta.js
-var mcpDecoratorsPlugin = async (app, options) => {
-  const { tools, resources, prompts } = options;
-  app.decorate("mcpAddTool", (definition, handler) => {
-    const name = definition.name;
-    if (!name) {
-      throw new Error("Tool definition must have a name");
-    }
-    if (definition.inputSchema) {
-      const schemaErrors = validateToolSchema(definition.inputSchema);
-      if (schemaErrors.length > 0) {
-        throw new Error(`Invalid tool schema for '${name}': ${schemaErrors.join(", ")}`);
-      }
-    }
-    const toolDefinition = definition;
-    tools.set(name, {
-      definition: {
-        ...toolDefinition,
-        // Store the original schema for validation (TypeBox or JSON Schema)
-        inputSchema: definition.inputSchema || toolDefinition.inputSchema
-      },
-      handler
-    });
-  });
-  app.decorate("mcpAddResource", (definition, handler) => {
-    const uriPattern = definition.uriPattern || definition.uri;
-    if (!uriPattern) {
-      throw new Error("Resource definition must have a uri or uriPattern");
-    }
-    const resourceDefinition = {
-      ...definition,
-      uri: uriPattern
-    };
-    resources.set(uriPattern, { definition: resourceDefinition, handler });
-  });
-  app.decorate("mcpAddPrompt", (definition, handler) => {
-    const name = definition.name;
-    if (!name) {
-      throw new Error("Prompt definition must have a name");
-    }
-    const promptDefinition = definition.argumentSchema ? {
-      ...definition,
-      arguments: schemaToArguments(definition.argumentSchema)
-    } : definition;
-    prompts.set(name, {
-      definition: {
-        ...promptDefinition,
-        // Store the original TypeBox schema for validation
-        argumentSchema: definition.argumentSchema
-      },
-      handler
-    });
-  });
-};
-var meta_default = (0, import_fastify_plugin2.default)(mcpDecoratorsPlugin, {
-  name: "mcp-decorators"
-});
-
-// ../../../node_modules/@platformatic/mcp/dist/routes/mcp.js
-var import_fastify_plugin3 = __toESM(require_plugin2(), 1);
-import { randomUUID } from "crypto";
-
 // ../../../node_modules/@platformatic/mcp/dist/handlers.js
+var customResourcesListHandler = null;
+var customResourcesReadHandler = null;
+var customResourcesTemplatesListHandler = null;
+function setResourcesListHandler(handler) {
+  customResourcesListHandler = handler;
+}
+function setResourcesReadHandler(handler) {
+  customResourcesReadHandler = handler;
+}
+function setResourcesTemplatesListHandler(handler) {
+  customResourcesTemplatesListHandler = handler;
+}
+var resourceSubscriptions = /* @__PURE__ */ new Map();
+function getResourceSubscriptions() {
+  return resourceSubscriptions;
+}
+function uriPatternToRegex(pattern) {
+  const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const withParams = escaped.replace(/\\{([^}]+)\\}/g, "([^/]+)");
+  return new RegExp(`^${withParams}$`);
+}
+function findResourceByUri(resources, uri) {
+  const exact = resources.get(uri);
+  if (exact) return exact;
+  for (const [pattern, resource] of resources) {
+    if (pattern.includes("{") && uriPatternToRegex(pattern).test(uri)) {
+      return resource;
+    }
+  }
+  return void 0;
+}
 function createResponse(id, result) {
   return {
     jsonrpc: JSONRPC_VERSION,
@@ -77339,13 +77308,85 @@ function handleToolsList(request, dependencies) {
   };
   return createResponse(request.id, result);
 }
-function handleResourcesList(request, dependencies) {
-  const { resources } = dependencies;
+async function handleResourcesList(request, sessionId, dependencies) {
+  const { resources, request: fastifyRequest, reply, authContext, app } = dependencies;
+  if (customResourcesListHandler) {
+    try {
+      const params = request.params || {};
+      const result2 = await customResourcesListHandler(
+        { cursor: params.cursor },
+        { sessionId, request: fastifyRequest, reply, authContext }
+      );
+      if (result2) {
+        return createResponse(request.id, result2);
+      }
+    } catch (error) {
+      app.log.error({ error: error.message }, "Custom resources list handler failed");
+    }
+  }
   const result = {
     resources: Array.from(resources.values()).map((r2) => r2.definition),
     nextCursor: void 0
   };
   return createResponse(request.id, result);
+}
+async function handleResourceTemplatesList(request, sessionId, dependencies) {
+  const { resources, request: fastifyRequest, reply, authContext, app } = dependencies;
+  if (customResourcesTemplatesListHandler) {
+    try {
+      const params = request.params || {};
+      const result = await customResourcesTemplatesListHandler(
+        { cursor: params.cursor },
+        { sessionId, request: fastifyRequest, reply, authContext }
+      );
+      if (result) {
+        return createResponse(request.id, result);
+      }
+    } catch (error) {
+      app.log.error({ error: error.message }, "Custom templates list handler failed");
+    }
+  }
+  const resourceTemplates = Array.from(resources.values()).filter((r2) => r2.definition.uri && r2.definition.uri.includes("{")).map((r2) => ({
+    uriTemplate: r2.definition.uri,
+    name: r2.definition.name,
+    description: r2.definition.description,
+    mimeType: r2.definition.mimeType
+  }));
+  return createResponse(request.id, { resourceTemplates });
+}
+async function handleResourcesSubscribe(request, sessionId, dependencies) {
+  const { app } = dependencies;
+  const params = request.params;
+  if (!params?.uri) {
+    return createError(request.id, INVALID_PARAMS, "Missing uri parameter");
+  }
+  if (!sessionId) {
+    return createError(request.id, INVALID_PARAMS, "Session ID required for subscriptions");
+  }
+  const uri = params.uri;
+  if (!resourceSubscriptions.has(sessionId)) {
+    resourceSubscriptions.set(sessionId, /* @__PURE__ */ new Set());
+  }
+  resourceSubscriptions.get(sessionId).add(uri);
+  app.log.info({ sessionId, uri }, "Resource subscription added");
+  return createResponse(request.id, {});
+}
+async function handleResourcesUnsubscribe(request, sessionId, dependencies) {
+  const { app } = dependencies;
+  const params = request.params;
+  if (!params?.uri) {
+    return createError(request.id, INVALID_PARAMS, "Missing uri parameter");
+  }
+  const uri = params.uri;
+  const sessionSubs = resourceSubscriptions.get(sessionId);
+  if (sessionSubs) {
+    sessionSubs.delete(uri);
+    if (sessionSubs.size === 0) {
+      resourceSubscriptions.delete(sessionId);
+    }
+  }
+  app.log.info({ sessionId, uri }, "Resource subscription removed");
+  return createResponse(request.id, {});
 }
 function handlePromptsList(request, dependencies) {
   const { prompts } = dependencies;
@@ -77462,7 +77503,7 @@ async function handleToolsCall(request, sessionId, dependencies) {
   }
 }
 async function handleResourcesRead(request, sessionId, dependencies) {
-  const { resources } = dependencies;
+  const { resources, request: fastifyRequest, reply, authContext, app } = dependencies;
   const paramsValidation = validate2(ReadResourceRequestSchema, request.params);
   if (!paramsValidation.success) {
     return createError(request.id, INVALID_PARAMS, "Invalid resource read parameters", {
@@ -77471,7 +77512,20 @@ async function handleResourcesRead(request, sessionId, dependencies) {
   }
   const params = paramsValidation.data;
   const uri = params.uri;
-  const resource = resources.get(uri);
+  if (customResourcesReadHandler) {
+    try {
+      const result = await customResourcesReadHandler(
+        uri,
+        { sessionId, request: fastifyRequest, reply, authContext }
+      );
+      if (result) {
+        return createResponse(request.id, result);
+      }
+    } catch (error) {
+      app.log.error({ error: error.message, uri }, "Custom resources read handler failed");
+    }
+  }
+  const resource = findResourceByUri(resources, uri);
   if (!resource) {
     return createError(request.id, METHOD_NOT_FOUND, `Resource '${uri}' not found`);
   }
@@ -77644,13 +77698,19 @@ async function handleRequest(request, sessionId, dependencies) {
       case "tools/list":
         return handleToolsList(request, dependencies);
       case "resources/list":
-        return handleResourcesList(request, dependencies);
+        return await handleResourcesList(request, sessionId, dependencies);
+      case "resources/templates/list":
+        return await handleResourceTemplatesList(request, sessionId, dependencies);
       case "prompts/list":
         return handlePromptsList(request, dependencies);
       case "tools/call":
         return await handleToolsCall(request, sessionId, dependencies);
       case "resources/read":
         return await handleResourcesRead(request, sessionId, dependencies);
+      case "resources/subscribe":
+        return await handleResourcesSubscribe(request, sessionId, dependencies);
+      case "resources/unsubscribe":
+        return await handleResourcesUnsubscribe(request, sessionId, dependencies);
       case "prompts/get":
         return await handlePromptsGet(request, sessionId, dependencies);
       default:
@@ -77683,7 +77743,82 @@ async function processMessage(message, sessionId, dependencies) {
   }
 }
 
+// ../../../node_modules/@platformatic/mcp/dist/decorators/meta.js
+var mcpDecoratorsPlugin = async (app, options) => {
+  const { tools, resources, prompts } = options;
+  app.decorate("mcpAddTool", (definition, handler) => {
+    const name = definition.name;
+    if (!name) {
+      throw new Error("Tool definition must have a name");
+    }
+    if (definition.inputSchema) {
+      const schemaErrors = validateToolSchema(definition.inputSchema);
+      if (schemaErrors.length > 0) {
+        throw new Error(`Invalid tool schema for '${name}': ${schemaErrors.join(", ")}`);
+      }
+    }
+    const toolDefinition = definition;
+    tools.set(name, {
+      definition: {
+        ...toolDefinition,
+        // Store the original schema for validation (TypeBox or JSON Schema)
+        inputSchema: definition.inputSchema || toolDefinition.inputSchema
+      },
+      handler
+    });
+  });
+  app.decorate("mcpAddResource", (definition, handler) => {
+    const uriPattern = definition.uriPattern || definition.uri;
+    if (!uriPattern) {
+      throw new Error("Resource definition must have a uri or uriPattern");
+    }
+    const resourceDefinition = {
+      ...definition,
+      uri: uriPattern
+    };
+    resources.set(uriPattern, { definition: resourceDefinition, handler });
+  });
+  app.decorate("mcpAddPrompt", (definition, handler) => {
+    const name = definition.name;
+    if (!name) {
+      throw new Error("Prompt definition must have a name");
+    }
+    const promptDefinition = definition.argumentSchema ? {
+      ...definition,
+      arguments: schemaToArguments(definition.argumentSchema)
+    } : definition;
+    prompts.set(name, {
+      definition: {
+        ...promptDefinition,
+        // Store the original TypeBox schema for validation
+        argumentSchema: definition.argumentSchema
+      },
+      handler
+    });
+  });
+  app.decorate("mcpSetResourcesListHandler", (handler) => {
+    setResourcesListHandler(handler);
+    app.log.debug("Custom resources list handler registered");
+  });
+  app.decorate("mcpSetResourcesReadHandler", (handler) => {
+    setResourcesReadHandler(handler);
+    app.log.debug("Custom resources read handler registered");
+  });
+  app.decorate("mcpSetResourcesTemplatesListHandler", (handler) => {
+    setResourcesTemplatesListHandler(handler);
+    app.log.debug("Custom resources templates list handler registered");
+  });
+  app.decorate("mcpGetResourceSubscriptions", () => {
+    return getResourceSubscriptions();
+  });
+};
+var meta_default = (0, import_fastify_plugin2.default)(mcpDecoratorsPlugin, {
+  name: "mcp-decorators"
+});
+
 // ../../../node_modules/@platformatic/mcp/dist/routes/mcp.js
+var import_fastify_plugin3 = __toESM(require_plugin2(), 1);
+import { randomUUID } from "crypto";
 var mcpPubSubRoutesPlugin = async (app, options) => {
   const { enableSSE, opts: opts2, capabilities, serverInfo, tools, resources, prompts, sessionStore, messageBroker, localStreams } = options;
   async function createSSESession() {
@@ -114868,7 +115003,63 @@ var SpecsUriSchema = Type.String({
   pattern: "^aip://specs/.+",
   description: "URI for modified OpenAPI specs"
 });
+var RESOURCE_TEMPLATES = [
+  {
+    uriTemplate: "aip://findings/{reviewId}",
+    name: "AIP Review Findings",
+    description: "Access cached AIP review findings by reviewId. May include code locations if correlated.",
+    mimeType: "application/json"
+  },
+  {
+    uriTemplate: "aip://specs/{specId}",
+    name: "Modified OpenAPI Specs",
+    description: "Access modified OpenAPI specs by specId.",
+    mimeType: "application/octet-stream"
+  }
+];
 function registerAipResources(fastify) {
+  fastify.mcpSetResourcesListHandler(
+    async (_params, _context) => {
+      const findingsStore2 = getFindingsStorage();
+      const tempStore = getTempStorage();
+      const [findingsResult, specsResult] = await Promise.all([
+        findingsStore2.listAll(),
+        tempStore.listAll()
+      ]);
+      const findingsList = findingsResult.items;
+      const specsList = specsResult.items;
+      const resources = [
+        // Map findings to resources
+        ...findingsList.map((f3) => ({
+          uri: `aip://findings/${f3.id}`,
+          name: `AIP Review ${f3.id.slice(0, 8)}`,
+          description: `AIP review findings (created ${new Date(f3.createdAt).toISOString()})`,
+          mimeType: "application/json",
+          annotations: {
+            audience: ["assistant"],
+            priority: 0.8
+          }
+        })),
+        // Map specs to resources
+        ...specsList.map((s3) => ({
+          uri: `aip://specs/${s3.id}`,
+          name: `Spec ${s3.id.slice(0, 8)}`,
+          description: `Modified OpenAPI spec (${s3.contentType})`,
+          mimeType: s3.contentType === "yaml" ? "application/x-yaml" : "application/json",
+          annotations: {
+            audience: ["assistant"],
+            priority: 0.6
+          }
+        }))
+      ];
+      return { resources, nextCursor: void 0 };
+    }
+  );
+  fastify.mcpSetResourcesTemplatesListHandler(
+    async (_params, _context) => {
+      return { resourceTemplates: RESOURCE_TEMPLATES, nextCursor: void 0 };
+    }
+  );
   fastify.mcpAddResource(
     {
       uriPattern: "aip://findings/{reviewId}",
@@ -114966,7 +115157,7 @@ function registerAipResources(fastify) {
       };
     }
   );
-  fastify.log.info("AIP resources registered");
+  fastify.log.info("AIP resources registered with custom handlers");
 }
 
 // src/prompts/handlers/code-locator-prompt.ts
