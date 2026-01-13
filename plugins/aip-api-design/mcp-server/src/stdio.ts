@@ -4,12 +4,17 @@
  *
  * Runs the MCP server over standard input/output for local integration
  * with Claude Code and Claude Desktop.
+ *
+ * Uses @platformatic/mcp's STDIO transport.
  */
 
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { createMcpServer, SERVER_NAME, SERVER_VERSION } from './mcp.js';
+import Fastify from 'fastify';
+import mcpPlugin from '@platformatic/mcp';
+import { runStdioServer } from '@platformatic/mcp';
+
+import { securityPlugin } from './plugins/security.js';
 import {
   initTempStorage,
   shutdownTempStorage,
@@ -19,7 +24,10 @@ import {
   shutdownFindingsStorage,
 } from './services/findings-storage.js';
 import { WorkerPool } from './tools/worker-pool.js';
-import type { ToolContext } from './tools/types.js';
+import { registerAipTools } from './tools/register.js';
+import { registerAipResources } from './resources/register.js';
+import { registerAipPrompts } from './prompts/register.js';
+import { SERVER_NAME, SERVER_VERSION } from './server.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -48,9 +56,39 @@ async function main() {
     `Worker pool initialized with ${workerPool.stats.total} workers`
   );
 
-  const toolContext: ToolContext = { workerPool };
-  const mcpServer = createMcpServer(toolContext);
-  const transport = new StdioServerTransport();
+  // Create Fastify instance
+  const fastify = Fastify({
+    logger: {
+      level: 'warn',
+      transport: {
+        target: 'pino/file',
+        options: { destination: 2 }, // stderr
+      },
+    },
+  });
+
+  // Security plugin (for consistent behavior, though not strictly needed in STDIO)
+  await fastify.register(securityPlugin);
+
+  // Register @platformatic/mcp plugin (no authorization for STDIO)
+  await fastify.register(mcpPlugin, {
+    serverInfo: {
+      name: SERVER_NAME,
+      version: SERVER_VERSION,
+    },
+    capabilities: {
+      tools: {},
+      resources: {},
+      prompts: {},
+    },
+    instructions:
+      'AIP OpenAPI Reviewer - Analyze OpenAPI specs against Google API Improvement Proposals',
+  });
+
+  // Register AIP tools, resources, and prompts
+  registerAipTools(fastify, { workerPool });
+  registerAipResources(fastify);
+  registerAipPrompts(fastify);
 
   // Log to stderr to avoid interfering with MCP protocol on stdout
   console.error(`${SERVER_NAME} v${SERVER_VERSION} starting in STDIO mode...`);
@@ -59,13 +97,15 @@ async function main() {
     await workerPool.shutdown();
     await shutdownFindingsStorage();
     await shutdownTempStorage();
+    await fastify.close();
     process.exit(0);
   };
 
   process.on('SIGINT', cleanup);
   process.on('SIGTERM', cleanup);
 
-  await mcpServer.connect(transport);
+  // Run the STDIO server
+  await runStdioServer(fastify);
 
   console.error(`${SERVER_NAME} connected and ready`);
 }
